@@ -1,23 +1,10 @@
-# DEPRECATED
-
 import svgwrite
-import svglib
 import logging
-
-# for rendering
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPDF, renderPM
-
-
 from dataclasses import dataclass, field
-from collections import namedtuple
-GridIndex = namedtuple('GridIndex', 'row col')
-Rect = namedtuple('Rect', 'left top width height')
 
-class SpecificationError(Exception):
-    pass
+from ..common import GridIndex, Rect
 
-#TODO doc
+
 @dataclass(frozen=True)
 class PatternSpecificationEddie:
     """Specification of an Eddie-like calibration pattern as
@@ -60,8 +47,10 @@ class PatternSpecificationEddie:
         circles_per_row:        Number of circles along each row
 
         circles_per_col:        Number of circles along each column
-        skipped_circle_indices: TODO
-        square_topleft_corner:  TODO
+
+        skipped_circle_indices: TODO doc
+
+        square_topleft_corner:  TODO doc
 
         marker_size_mm:         Length of the center marker's edge in [mm].
 
