@@ -2,3 +2,4 @@ vito
 svglib
 svgwrite
 dataclasses
+opencv-python
