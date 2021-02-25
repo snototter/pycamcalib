@@ -9,6 +9,6 @@ import logging
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO,
                         format='[%(levelname)s] %(message)s')
-    patterns.export_pattern(patterns.eddie.eddie_specs_v1, 'test-folder', None,
+    patterns.export_pattern(patterns.eddie.eddie_test_specs_a4, 'test-folder', None,
                           export_pdf=True, export_png=False,
                           prevent_overwrite=False)

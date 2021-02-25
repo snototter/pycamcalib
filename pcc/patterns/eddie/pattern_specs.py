@@ -177,7 +177,7 @@ class PatternSpecificationEddie:
 * Colors: {self.fg_color} on {self.bg_color}"""
 #TODO add remaining specs to __str__
 
-    def export_svg(self, filename):
+    def render_svg(self):
         logging.info(f'Drawing calibration pattern: {self}')
         h_mm = self.target_height_mm
         w_mm = self.target_width_mm
@@ -186,7 +186,7 @@ class PatternSpecificationEddie:
         def _mm(v):
             return f'{v}mm'
 
-        dwg = svgwrite.Drawing(filename=filename, profile='full')
+        dwg = svgwrite.Drawing(profile='full')
     #, height=f'{h_target_mm}mm', width=f'{w_target_mm}mm', profile='tiny', debug=False)
         # Height/width weren't set properly in the c'tor (my SVGs had 100% instead
         # of the desired dimensions). Thus, set the attributes manually:
@@ -224,30 +224,28 @@ class PatternSpecificationEddie:
         # dwg.add(dwg.rect(insert=(_mm(pspecs.min_margin_target_mm), _mm(pspecs.min_margin_target_mm)),
         #                  size=(_mm(w_mm - 2*pspecs.min_margin_target_mm), _mm(h_mm - 2*pspecs.min_margin_target_mm)),
         #                  stroke='black', stroke_width='1mm', fill='none'))
-        dwg.save()
+        return dwg
+
+    def export_svg(self, filename):
+        dwg = self.render_svg()
+        dwg.saveas(filename, pretty=True)
 
 
 # eddie_specs_v1 = PatternSpecification('eddie-v1-alu',
 #     target_width_mm=300, target_height_mm=400,
 #     dia_circles_mm=5, dist_circles_mm=11)
 
-eddie_specs_v1 = PatternSpecificationEddie('eddie-calib-test-a4',
+eddie_test_specs_a4 = PatternSpecificationEddie('Eddie Test Pattern A4',
     target_width_mm=210, target_height_mm=297,
     dia_circles_mm=5, dist_circles_mm=11)
 
 
-def convert_svg_pattern(svg_filename, output_filename):
-    """Saves the given SVG file as PDF and PNG."""
-    drawing = svg2rlg(svg_filename)
-    renderPDF.drawToFile(drawing, f"{output_filename}.pdf")
-    renderPM.drawToFile(drawing, f"{output_filename}.png", fmt="PNG")
-
-
 if __name__ == '__main__':
+    from ..export import export_pattern
+    import os
     logging.basicConfig(level=logging.INFO,
                         format='[%(levelname)s] %(message)s')
-    pattern_name = 'eddie-v1'
-    svg_filename = f'{pattern_name}.svg'
-    eddie_specs_v1.export_svg(svg_filename)
-    convert_svg_pattern(svg_filename, pattern_name)
-
+    folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'exported')
+    export_pattern(eddie_test_specs_a4, folder,
+                   None, export_pdf=True, export_png=True,
+                   prevent_overwrite=False)
