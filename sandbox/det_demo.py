@@ -159,10 +159,15 @@ if __name__ == '__main__':
         patterns.Point(marker.shape[1]-moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0]),
         patterns.Point(moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0])]
     print('TPL CORNERS:', [c.to_int() for c in corners])
+    print('barycenter:', patterns.center(corners))
     #TODO exported SVG is 3-channel png!!
     imvis.imshow(tpl, 'tpl', wait_ms=10)
     imvis.imshow(marker, 'cropped', wait_ms=-1)
+    #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
 
+
+
+    # Doesn't work
     # #https://gist.github.com/jrief/25962a9194ec1c6c3c590bf8977fd0ff
     # drawing = svg2rlg("foo.svg")
     # left, bottom, right, top =  drawing.getBounds() # this returns negative bounds for our exported svgs!?!?
