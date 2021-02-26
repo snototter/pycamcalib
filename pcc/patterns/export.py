@@ -5,6 +5,7 @@ from reportlab.graphics import renderPDF, renderPM
 from vito import pyutils
 
 
+#FIXME add export_svg flag - if false, use stringio
 def export_pattern(pattern_spec, output_folder, output_basename=None,
                    export_pdf=True, export_png=True, prevent_overwrite=True):
     """Saves the given pattern as SVG and optionally PDF and/or PNG.

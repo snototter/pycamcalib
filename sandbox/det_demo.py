@@ -2,21 +2,18 @@ import cv2
 import numpy as np
 from vito import imvis, imutils
 
-from dataclasses import dataclass
+# from dataclasses import dataclass
 
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPDF, renderPM
+# from svglib.svglib import svg2rlg
+# from reportlab.graphics import renderPDF, renderPM
 import sys
 import os
 sys.path.append(os.path.realpath(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..')))
 from pcc import patterns
 
-@dataclass
-class ContourDetectionParams:
-    marker_template_size_px: int = 64
 
 def load_images():
-    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in [0, 6]]#range(6)]
+    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in [0, 1, 6]]#range(6)]
 
 def hough_lines(img):
     g = imutils.grayscale(img)
@@ -117,57 +114,60 @@ def fld_lines(img):
 def det_demo(imgs):
     for img in imgs:
         # fld_lines(img)
-        hough_lines(img)
+        # hough_lines(img)
         contour(img)
         # mser(img)
 
 
 if __name__ == '__main__':
-    dummy = patterns.eddie.PatternSpecificationEddie('dummy',
+    pattern_specs = patterns.eddie.PatternSpecificationEddie('dummy',
         target_width_mm=210, target_height_mm=297,
         dia_circles_mm=5, dist_circles_mm=11, bg_color='orange')
-    #TODO remove viewbox test
-    # patterns.export_pattern(patterns.eddie.eddie_test_specs_a4, 'test-folder', None,
-    #                       export_pdf=True, export_png=False,
+    patterns.eddie.ContourDetectionParams().get_marker_template(pattern_specs)
+
+    # patterns.export_pattern(dummy, 'test-folder', None,
+    #                       export_pdf=False, export_png=True,
     #                       prevent_overwrite=False)
-    #Adjusting the viewbox didn't work well when exporting to PNG ("weird" scaling issues....)
-    # dwg = pattern.render_svg()
-    # print('\n'.join(['{}:{}'.format(k, dwg.attribs[k]) for k in dwg.attribs]))
-    # dwg.attribs['viewBox'] = '0 0 200 290'
-    # dwg.saveas('foo.svg')
-    # drawing = svg2rlg('foo.svg')
-    # renderPM.drawToFile(drawing, 'foo.png', fmt="PNG", dpi=72)
-    patterns.export_pattern(dummy, 'test-folder', None,
-                          export_pdf=False, export_png=True,
-                          prevent_overwrite=False)
 
-    pattern = patterns.eddie.eddie_test_specs_a4
-    mrect, moffset = pattern.get_relative_marker_rect(pattern.dist_circles_mm)
-    # tpl = imutils.imread('../pcc/patterns/eddie/exported/eddie-test-pattern-a4.png')
-    tpl = imutils.imread('test-folder/dummy.png')
-    img_h, img_w = tpl.shape[:2]
-    mroi = patterns.Rect(left=np.floor(img_w * mrect.left),
-            top=np.floor(img_h * mrect.top),
-            width=np.floor(img_w * mrect.width),
-            height=np.floor(img_h * mrect.height))
+    # pattern = patterns.eddie.eddie_test_specs_a4
+    # mrect, moffset = pattern.get_relative_marker_rect(pattern.dist_circles_mm)
+    # # tpl = imutils.imread('../pcc/patterns/eddie/exported/eddie-test-pattern-a4.png')
+    # tpl = imutils.imread('test-folder/dummy.png')
+    # img_h, img_w = tpl.shape[:2]
+    # mroi = patterns.Rect(left=np.floor(img_w * mrect.left),
+    #         top=np.floor(img_h * mrect.top),
+    #         width=np.floor(img_w * mrect.width),
+    #         height=np.floor(img_h * mrect.height))
     
-    print(mroi, 'vs shape', tpl.shape)
-    marker = imutils.crop(tpl, mroi.to_int())
+    # print(mroi, 'vs shape', tpl.shape)
+    # marker = imutils.crop(tpl, mroi.to_int())
 
-    corners = [patterns.Point(moffset.x*marker.shape[1], moffset.y*marker.shape[0]),
-        patterns.Point(marker.shape[1]-moffset.x*marker.shape[1], moffset.y*marker.shape[0]),
-        patterns.Point(marker.shape[1]-moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0]),
-        patterns.Point(moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0])]
-    print('TPL CORNERS:', [c.to_int() for c in corners])
-    print('barycenter:', patterns.center(corners))
-    #TODO exported SVG is 3-channel png!!
-    imvis.imshow(tpl, 'tpl', wait_ms=10)
-    imvis.imshow(marker, 'cropped', wait_ms=-1)
-    #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
+    # corners = [patterns.Point(moffset.x*marker.shape[1], moffset.y*marker.shape[0]),
+    #     patterns.Point(marker.shape[1]-moffset.x*marker.shape[1], moffset.y*marker.shape[0]),
+    #     patterns.Point(marker.shape[1]-moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0]),
+    #     patterns.Point(moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0])]
+    # print('TPL CORNERS:', [c.to_int() for c in corners])
+    # print('SORTED:', [c.to_int() for c in patterns.sort_points_ccw(corners)])
+    # print('barycenter:', patterns.center(corners))
+    # imvis.imshow(tpl, 'tpl', wait_ms=10)
+    # imvis.imshow(marker, 'cropped', wait_ms=10)
+
+    # #TODO exported SVG is 3-channel png!!
+
+    # Match template:
+    # #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
 
 
 
-    # Doesn't work
+
+
+    imgs = load_images()
+    det_demo(imgs)
+
+
+
+##### Stuff, that didn't work:
+    # setting SVG clippath
     # #https://gist.github.com/jrief/25962a9194ec1c6c3c590bf8977fd0ff
     # drawing = svg2rlg("foo.svg")
     # left, bottom, right, top =  drawing.getBounds() # this returns negative bounds for our exported svgs!?!?
@@ -182,5 +182,14 @@ if __name__ == '__main__':
     # clipRect.setAttribute('height', f'{mrect.height*pattern.target_height_mm}mm')
     # canvas.save('cropped.svg')
 
-    imgs = load_images()
-    det_demo(imgs)
+    # setting viewbox test
+    # patterns.export_pattern(patterns.eddie.eddie_test_specs_a4, 'test-folder', None,
+    #                       export_pdf=True, export_png=False,
+    #                       prevent_overwrite=False)
+    #Adjusting the viewbox didn't work well when exporting to PNG ("weird" scaling issues....)
+    # dwg = pattern.render_svg()
+    # print('\n'.join(['{}:{}'.format(k, dwg.attribs[k]) for k in dwg.attribs]))
+    # dwg.attribs['viewBox'] = '0 0 200 290'
+    # dwg.saveas('foo.svg')
+    # drawing = svg2rlg('foo.svg')
+    # renderPM.drawToFile(drawing, 'foo.png', fmt="PNG", dpi=72)

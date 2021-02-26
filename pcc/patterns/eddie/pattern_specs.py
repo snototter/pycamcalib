@@ -1,7 +1,10 @@
-import svgwrite
 import logging
+import io
+import svgwrite
+from svglib.svglib import svg2rlg
+from reportlab.graphics import renderPM
 from dataclasses import dataclass, field
-
+from vito import imutils
 from ..common import GridIndex, Rect, Point
 
 #TODO add member for default file location (within the package once we deploy it)
@@ -50,9 +53,12 @@ class PatternSpecificationEddie:
 
         circles_per_col:        Number of circles along each column
 
-        skipped_circle_indices: TODO doc
+        skipped_circle_indices: Grid indices which should be skipped
+                                because they're occluded by the central
+                                marker
 
-        square_topleft_corner:  TODO doc
+        square_topleft_corner:  Grid indices of the top left corner of
+                                the central marker
 
         marker_size_mm:         Length of the center marker's edge in [mm].
 
@@ -138,7 +144,7 @@ class PatternSpecificationEddie:
         return free_x/2, free_y/2
     
     @property
-    def square_rects(self):
+    def _square_rects(self):
         tl = self.square_topleft_corner
         mx, my = self.computed_margins
         offset_x = mx + self.r_circles_mm
@@ -217,7 +223,7 @@ class PatternSpecificationEddie:
             cy_mm += self.dist_circles_mm
         # Draw Eddie's face
         marker = dwg.add(dwg.g(id='marker'))
-        for r in self.square_rects:
+        for r in self._square_rects:
             marker.add(dwg.rect(insert=(_mm(r.left), _mm(r.top)),
                                 size=(_mm(r.width), _mm(r.height)),
                                 class_="grid"))#fill=pspecs.bg_color)
@@ -231,6 +237,17 @@ class PatternSpecificationEddie:
     def export_svg(self, filename):
         dwg = self.render_svg()
         dwg.saveas(filename, pretty=True)
+
+    def render_image(self):
+        """Renders the calibration pattern to an image (NumPy ndarray),
+        performing all actions in-memory."""
+        # Load the rendered SVG into a StringIO
+        svg_sio = io.StringIO(self.render_svg().tostring())
+        # Render it to PNG in-memory
+        dwg_input = svg2rlg(svg_sio)
+        img_mem_file = io.BytesIO()
+        renderPM.drawToFile(dwg_input, img_mem_file, fmt="PNG")
+        return imutils.memory_file2ndarray(img_mem_file)
 
     def get_relative_marker_rect(self, margin_mm):
         """
@@ -256,21 +273,24 @@ class PatternSpecificationEddie:
         return rect, offset
 
 
-# eddie_specs_v1 = PatternSpecification('eddie-v1-alu',
-#     target_width_mm=300, target_height_mm=400,
-#     dia_circles_mm=5, dist_circles_mm=11)
-
+"""Test pattern for development."""
 eddie_test_specs_a4 = PatternSpecificationEddie('Eddie Test Pattern A4',
     target_width_mm=210, target_height_mm=297,
     dia_circles_mm=5, dist_circles_mm=11)
 
 
+def save_eddie_assets():
+    """Export the pre-configured targets to the module's export folder."""
+    folder = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                          'exported')
+    export_pattern(eddie_test_specs_a4, folder,
+                   None, export_pdf=True, export_png=True,
+                   prevent_overwrite=False)
+
+    
 if __name__ == '__main__':
     from ..export import export_pattern
     import os
     logging.basicConfig(level=logging.INFO,
                         format='[%(levelname)s] %(message)s')
-    folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'exported')
-    export_pattern(eddie_test_specs_a4, folder,
-                   None, export_pdf=True, export_png=True,
-                   prevent_overwrite=False)
+    save_eddie_assets()
