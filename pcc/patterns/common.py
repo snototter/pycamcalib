@@ -2,6 +2,7 @@ from collections import namedtuple
 from dataclasses import dataclass
 from functools import cmp_to_key
 
+
 GridIndex = namedtuple('GridIndex', 'row col')
 
 
@@ -37,7 +38,10 @@ def center(ptlist):
         sum_.y += pt.y
     return Point(x=sum_.x/N, y=sum_.y/N)
 
+
 def ccw_cmp(pt_ref, pt1, pt2):
+    """Comparator to sort 2d points w.r.t. to a reference
+    point in counter-clockwise order."""
     # Cross product of the vectors (p1 - pt_ref) and (p2 - pt_ref) yields
     # the signed area:
     area_rect = (pt1.x - pt_ref.x)*(pt2.y - pt_ref.y)\
@@ -47,6 +51,7 @@ def ccw_cmp(pt_ref, pt1, pt2):
     elif area_rect > 0:
         return 1
     return -1
+
 
 def sort_points_ccw(pt_list, pt_ref=None, reverse=False):
     """

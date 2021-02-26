@@ -123,46 +123,15 @@ if __name__ == '__main__':
     pattern_specs = patterns.eddie.PatternSpecificationEddie('dummy',
         target_width_mm=210, target_height_mm=297,
         dia_circles_mm=5, dist_circles_mm=11, bg_color='orange')
-    patterns.eddie.ContourDetectionParams().get_marker_template(pattern_specs)
-
-    # patterns.export_pattern(dummy, 'test-folder', None,
-    #                       export_pdf=False, export_png=True,
-    #                       prevent_overwrite=False)
-
-    # pattern = patterns.eddie.eddie_test_specs_a4
-    # mrect, moffset = pattern.get_relative_marker_rect(pattern.dist_circles_mm)
-    # # tpl = imutils.imread('../pcc/patterns/eddie/exported/eddie-test-pattern-a4.png')
-    # tpl = imutils.imread('test-folder/dummy.png')
-    # img_h, img_w = tpl.shape[:2]
-    # mroi = patterns.Rect(left=np.floor(img_w * mrect.left),
-    #         top=np.floor(img_h * mrect.top),
-    #         width=np.floor(img_w * mrect.width),
-    #         height=np.floor(img_h * mrect.height))
-    
-    # print(mroi, 'vs shape', tpl.shape)
-    # marker = imutils.crop(tpl, mroi.to_int())
-
-    # corners = [patterns.Point(moffset.x*marker.shape[1], moffset.y*marker.shape[0]),
-    #     patterns.Point(marker.shape[1]-moffset.x*marker.shape[1], moffset.y*marker.shape[0]),
-    #     patterns.Point(marker.shape[1]-moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0]),
-    #     patterns.Point(moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0])]
-    # print('TPL CORNERS:', [c.to_int() for c in corners])
-    # print('SORTED:', [c.to_int() for c in patterns.sort_points_ccw(corners)])
-    # print('barycenter:', patterns.center(corners))
-    # imvis.imshow(tpl, 'tpl', wait_ms=10)
-    # imvis.imshow(marker, 'cropped', wait_ms=10)
-
-    # #TODO exported SVG is 3-channel png!!
+    # patterns.eddie.ContourDetectionParams().get_marker_template(pattern_specs)
 
     # Match template:
     # #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
 
-
-
-
-
     imgs = load_images()
-    det_demo(imgs)
+    for img in imgs:
+        patterns.eddie.find_marker(img, pattern_specs)
+    # det_demo(imgs)
 
 
 
