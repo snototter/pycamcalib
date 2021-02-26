@@ -2,7 +2,7 @@ import svgwrite
 import logging
 from dataclasses import dataclass, field
 
-from ..common import GridIndex, Rect
+from ..common import GridIndex, Rect, Point
 
 #TODO add member for default file location (within the package once we deploy it)
 # this would allow loading svg/png w/o rendering first...
@@ -248,9 +248,12 @@ class PatternSpecificationEddie:
 
         top = tlidx.row * self.dist_circles_mm + offset_y - self.r_circles_mm - margin_mm
         left = tlidx.col * self.dist_circles_mm + offset_x - self.r_circles_mm - margin_mm
-        return Rect(left=left/self.target_width_mm, top=top/self.target_height_mm,
+        rect = Rect(left=left/self.target_width_mm, top=top/self.target_height_mm,
                     width=(self.marker_size_mm + 2*margin_mm)/self.target_width_mm,
                     height=(self.marker_size_mm + 2*margin_mm)/self.target_height_mm)
+        offset = Point(x=margin_mm/(self.marker_size_mm + 2*margin_mm),
+                       y=margin_mm/(self.marker_size_mm + 2*margin_mm))
+        return rect, offset
 
 
 # eddie_specs_v1 = PatternSpecification('eddie-v1-alu',

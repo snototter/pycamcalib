@@ -44,9 +44,10 @@ def hough_lines(img):
         #imvis.imshow(edges, title='edges', wait_ms=10)
     imvis.imshow(vis, title='Hough', wait_ms=10)
     
+
 def contour(img):
     g = imutils.grayscale(img)
-    _, g = cv2.threshold(g, 0.0, 255.0, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+    _, g = cv2.threshold(g, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
     # g = imutils.gaussian_blur(g, 1)
     # g = cv2.blur(g, (3,3))
     vis = imutils.ensure_c3(g)
@@ -141,7 +142,7 @@ if __name__ == '__main__':
                           prevent_overwrite=False)
 
     pattern = patterns.eddie.eddie_test_specs_a4
-    mrect = pattern.get_relative_marker_rect(pattern.dist_circles_mm)
+    mrect, moffset = pattern.get_relative_marker_rect(pattern.dist_circles_mm)
     # tpl = imutils.imread('../pcc/patterns/eddie/exported/eddie-test-pattern-a4.png')
     tpl = imutils.imread('test-folder/dummy.png')
     img_h, img_w = tpl.shape[:2]
@@ -149,8 +150,15 @@ if __name__ == '__main__':
             top=np.floor(img_h * mrect.top),
             width=np.floor(img_w * mrect.width),
             height=np.floor(img_h * mrect.height))
+    
     print(mroi, 'vs shape', tpl.shape)
     marker = imutils.crop(tpl, mroi.to_int())
+
+    corners = [patterns.Point(moffset.x*marker.shape[1], moffset.y*marker.shape[0]),
+        patterns.Point(marker.shape[1]-moffset.x*marker.shape[1], moffset.y*marker.shape[0]),
+        patterns.Point(marker.shape[1]-moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0]),
+        patterns.Point(moffset.x*marker.shape[1], marker.shape[0]-moffset.y*marker.shape[0])]
+    print('TPL CORNERS:', [c.to_int() for c in corners])
     #TODO exported SVG is 3-channel png!!
     imvis.imshow(tpl, 'tpl', wait_ms=10)
     imvis.imshow(marker, 'cropped', wait_ms=-1)
