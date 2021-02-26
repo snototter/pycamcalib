@@ -45,5 +45,7 @@ def export_pattern(pattern_spec, output_folder, output_basename=None,
             renderPDF.drawToFile(drawing, fn_pdf)
             logging.info(f'Exported {pattern_spec.name} to {fn_pdf}')
         if export_png:
+            #FIXME increasing dpi doesn't work: https://github.com/deeplook/svglib/issues/207 
+            # Maybe switch to inkscape
             renderPM.drawToFile(drawing, fn_png, fmt="PNG")
             logging.info(f'Exported {pattern_spec.name} to {fn_png}')

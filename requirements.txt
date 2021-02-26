@@ -3,3 +3,4 @@ svglib
 svgwrite
 dataclasses
 opencv-python
+#opencv-contrib-python  # Required for FLD line segment detector

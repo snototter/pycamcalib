@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 
 from ..common import GridIndex, Rect
 
+#TODO add member for default file location (within the package once we deploy it)
+# this would allow loading svg/png w/o rendering first...
 
 @dataclass(frozen=True)
 class PatternSpecificationEddie:
@@ -134,7 +136,7 @@ class PatternSpecificationEddie:
         free_x = self.target_width_mm - (self.circles_per_row - 1) * self.dist_circles_mm - self.dia_circles_mm
         free_y = self.target_height_mm - (self.circles_per_col - 1) * self.dist_circles_mm - self.dia_circles_mm
         return free_x/2, free_y/2
-
+    
     @property
     def square_rects(self):
         tl = self.square_topleft_corner
@@ -186,7 +188,7 @@ class PatternSpecificationEddie:
         def _mm(v):
             return f'{v}mm'
 
-        dwg = svgwrite.Drawing(profile='full')
+        dwg = svgwrite.Drawing(profile='full')#, viewbox='0 0')
     #, height=f'{h_target_mm}mm', width=f'{w_target_mm}mm', profile='tiny', debug=False)
         # Height/width weren't set properly in the c'tor (my SVGs had 100% instead
         # of the desired dimensions). Thus, set the attributes manually:
@@ -229,6 +231,26 @@ class PatternSpecificationEddie:
     def export_svg(self, filename):
         dwg = self.render_svg()
         dwg.saveas(filename, pretty=True)
+
+    def get_relative_marker_rect(self, margin_mm):
+        """
+        Returns the center marker's position as a fraction of the calibration
+        target's dimensions.
+        Useful to extract the marker template for localization - because
+        adjusting the SVG viewbox didn't work well for exporting cropped PNGs.
+
+        :margin_mm: Specify the margin in [mm]
+        """
+        tlidx = self.square_topleft_corner
+        mx, my = self.computed_margins
+        offset_x = mx + self.r_circles_mm
+        offset_y = my + self.r_circles_mm
+
+        top = tlidx.row * self.dist_circles_mm + offset_y - self.r_circles_mm - margin_mm
+        left = tlidx.col * self.dist_circles_mm + offset_x - self.r_circles_mm - margin_mm
+        return Rect(left=left/self.target_width_mm, top=top/self.target_height_mm,
+                    width=(self.marker_size_mm + 2*margin_mm)/self.target_width_mm,
+                    height=(self.marker_size_mm + 2*margin_mm)/self.target_height_mm)
 
 
 # eddie_specs_v1 = PatternSpecification('eddie-v1-alu',
