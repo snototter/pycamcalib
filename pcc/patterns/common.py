@@ -1,3 +1,4 @@
+import numpy as np
 from collections import namedtuple
 from dataclasses import dataclass
 from functools import cmp_to_key
@@ -65,3 +66,14 @@ def sort_points_ccw(pt_list, pt_ref=None, reverse=False):
     return sorted(pt_list,
                   key=cmp_to_key(lambda pt1, pt2: ccw_cmp(pt_ref, pt1, pt2)),
                   reverse=True)
+
+
+def points2numpy(pt_list):
+    #TODO asert or return error code (maybe later)
+    assert pt_list is not None
+    assert len(pt_list) > 0
+    npp = np.zeros((len(pt_list), 2), dtype=np.float32)
+    for idx in range(len(pt_list)):
+        npp[idx, 0] = pt_list[idx].x
+        npp[idx, 1] = pt_list[idx].y
+    return npp
