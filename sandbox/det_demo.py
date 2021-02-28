@@ -118,6 +118,9 @@ def det_demo(imgs):
 
 
 if __name__ == '__main__':
+    ptl = [patterns.Point(0, 1), patterns.Point(0, 2), patterns.Point(0, 3), patterns.Point(0, 4), patterns.Point(0, 5), patterns.Point(-3, 0), patterns.Point(-2, 0)]
+    print(patterns.sort_points_ccw(ptl, patterns.Point(0, 0)))
+    print(patterns.sort_points_ccw(ptl, patterns.Point(0, 0), reverse=True))
     pattern_specs = patterns.eddie.PatternSpecificationEddie('dummy',
         target_width_mm=210, target_height_mm=297,
         dia_circles_mm=5, dist_circles_mm=11)#, bg_color='orange')

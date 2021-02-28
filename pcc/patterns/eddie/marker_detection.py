@@ -7,8 +7,16 @@ from ..common import GridIndex, Rect, Point, sort_points_ccw, points2numpy
 
 @dataclass
 class MarkerTemplate:
-    template_img : np.array
+    template_img : np.ndarray = field(init=True, repr=False)
     marker_corners : list
+
+
+@dataclass
+class Transform:
+    shape: dict = field(init=True, repr=False)
+    homography : np.ndarray = field(init=True, repr=False)
+    similarity : float
+    rotation_deg : int
 
 
 @dataclass
@@ -19,25 +27,46 @@ class ContourDetectionParams:
 
 
     TODO doc members/params
+    Configurable attributes:
+        marker_template_size_px:    How large the reference template should be for
+                                    correlation.
+
+        marker_margin_mm:           Margin between central marker and border of the
+                                    reference template for correlation
+
+        simplification_factor:      To simplify the contours (Douglas-Peucker),
+                                    we use an epsilon relative to the shape's
+                                    arc length (perimeter).
+
+        max_candidates_per_image:   Maximum number of candidate shapes to check per image
+
+        # Canny edge detector parametrization
+        edge_blur_kernel_size:      Size of the blur kernel for Canny edge detection, set
+                                    to <= 0 to disable blurring.
+
+        edge_canny_lower_thresh:    Lower hysteresis threshold for Canny edge detection.
+
+        edge_canny_upper_thresh:    Upper hysteresis threshold for Canny edge detection.
+
+        edge_sobel_aperture:        Sobel aperture size for Canny edge detection.
+
+        edge_dilation_kernel_size:  To close small gaps after edge extraction, we use a
+                                    dilation filter with this kernel size. Set to <= 0
+                                    to disable dilation.
     """
-    # How large the reference template should be for correlation
     marker_template_size_px: int = 64
-
-    # Margin between central marker and border of reference template for correlation
     marker_margin_mm: int = 3
-
-    # RDP simplification of contours uses an epsilon relative to the shape's arc length/perimeter
     simplification_factor: float = 0.05
-
-    # Maximum number of candidate shapes to check per image
     max_candidates_per_image: int = 3 #FIXME
-
-    # Canny edge detector parametrization
-    edge_blur_kernel_size: int = 3  # To disable blurring, set to 0 or a negative value
+    edge_blur_kernel_size: int = 3
     edge_canny_lower_thresh: int = 50
     edge_canny_upper_thresh: int = 200
     edge_sobel_aperture: int = 3
-    edge_dilation_kernel_size: int = 3  # To disable dilation, set to 0 or a negative value
+    edge_dilation_kernel_size: int = 3
+
+    # Acceptance threshold on the normalized correlation coefficient [-1, +1]
+    marker_ccoeff_thresh: float = 0.9
+
 
     _marker_tpl: dict() = field(init=False, repr=False)  # Stores already computed marker templates
 
@@ -57,7 +86,7 @@ class ContourDetectionParams:
                 top=np.floor(tpl_h * marker_rect_relative.top),
                 width=np.floor(tpl_w * marker_rect_relative.width),
                 height=np.floor(tpl_h * marker_rect_relative.height))
-            tpl_crop = cv2.resize(imutils.crop(tpl_full, tpl_roi.to_int()),
+            tpl_crop = cv2.resize(imutils.crop(tpl_full, tpl_roi.int_repr()),
                                 dsize=(self.marker_template_size_px,
                                         self.marker_template_size_px),
                                 interpolation=cv2.INTER_LANCZOS4)
@@ -113,6 +142,16 @@ def _md_preprocess_img(img, det_params):
 # UI widget later on....)
 
 
+def _ensure_quadrilateral(shape):
+    """Returns a 4-corner approximation of the given shape."""
+    if shape['num_corners'] < 4 or shape['num_corners'] > 6:
+        return None
+    if shape['num_corners'] == 4:
+        return shape
+    print('TODO line intersection, approximation')
+    return None
+
+
 def _md_find_shape_candidates(det_params, marker_template, edges, vis_img=None):
     """Locate candidate regions which could contain the marker."""
     # We don't want hierarchies of contours here, just the largest (i.e. the
@@ -143,11 +182,15 @@ def _md_find_shape_candidates(det_params, marker_template, edges, vis_img=None):
     # correspond to a rectangular region.
     candidate_shapes = list()
     for shape in shapes:
+        is_candidate = False
         if 3 < shape['num_corners'] < 6:
-            candidate_shapes.append(shape)
+            candidate = _ensure_quadrilateral(shape)
+            if candidate is not None:
+                is_candidate = True
+                candidate_shapes.append(candidate)
         if vis_img is not None:
             cv2.drawContours(vis_img, [shape['hull']], 0,
-                             (0, 255, 0) if 3 < shape['num_corners'] < 6 else (255, 0, 0), 3)
+                             (0, 255, 0) if is_candidate else (255, 0, 0), 7)
         # TODO v1 keep only the k largest shapes (strong perspective could cause circles closer
         # to the camera to be quite large!!) - v2 ratio test (if relative delta between subsequent
         # candidates is too small, abort)
@@ -155,16 +198,6 @@ def _md_find_shape_candidates(det_params, marker_template, edges, vis_img=None):
             logging.info(f'Reached maximum amount of {det_params.max_candidates_per_image} candidate shapes.')
             break
     return candidate_shapes, vis_img
-
-
-def _ensure_rect(shape):
-    """Returns a 4-corner approximation of the given shape."""
-    if shape['num_corners'] < 4 or shape['num_corners'] > 6:
-        return None
-    if shape['num_corners'] == 4:
-        return shape
-    print('TODO line intersection, approximation')
-    return None
 
 
 def _find_transform(img, candidate, det_params, marker_template):
@@ -179,18 +212,26 @@ def _find_transform(img, candidate, det_params, marker_template):
     if H is None:
         return None
     warped = cv2.warpPerspective(img, H, (det_params.marker_template_size_px,
-                                          det_params.marker_template_size_px))
+                                          det_params.marker_template_size_px)) #TODO border pad zero, replicate? (the latter)
     # Naive matching: try each possible rotation:
     vis_img = marker_template.template_img.copy()
-    pyutils.tic('naive')
-    for idx, fx in zip(range(4), [imutils.noop, imutils.rotate90,
-                                  imutils.rotate180, imutils.rotate270]):
+    pyutils.tic('naive')#TODO remove
+    transforms = [imutils.noop, imutils.rotate90,
+                  imutils.rotate180, imutils.rotate270]
+    similarities = np.zeros((len(transforms),))
+    for idx, fx in zip(range(4), transforms):
         rotated = fx(warped)
         res = cv2.matchTemplate(rotated, marker_template.template_img, cv2.TM_CCOEFF_NORMED)
-        print(f'{idx:d}: {res[0]}')
+        similarities[idx] = res[0, 0]
+        print(f'{idx:d}: {res.item(0)}')
         vis_img = imutils.concat(vis_img, rotated, horizontal=False)
-        imvis.imshow(vis_img, 'TPL+WARPED', wait_ms=100)
-    pyutils.toc('naive')
+    best_idx = np.argmax(similarities)
+    pyutils.toc('naive')#TODO remove
+    imvis.imshow(vis_img, 'TPL+WARPED', wait_ms=300) #TODO remove
+    if similarities[best_idx] > det_params.marker_ccoeff_thresh:
+        return Transform(shape=candidate, homography=H,
+                         similarity=similarities[best_idx],
+                         rotation_deg=90*best_idx)
     return None
 
 
@@ -213,16 +254,18 @@ def find_marker(img, pattern_specs, det_params=ContourDetectionParams()):
     pyutils.toc('find_marker-contours')#TODO remove
     pyutils.tic('find_marker-projective')#TODO remove
     # Find best fitting candidate (if any)
+    transforms = list()
     for shape in candidate_shapes:
-        candidate = _ensure_rect(shape)
-        if candidate is None:
-            continue
         # Compute homography between marker template and detected candidate
-        transform = _find_transform(img, candidate, det_params, marker_template)
-        
-        # 450,450)
-    pyutils.toc('projective')#TODO remove
-    # print('TPL CORNERS:', [c.to_int() for c in corners])
-    # print('SORTED:', [c.to_int() for c in patterns.sort_points_ccw(corners)])
+        transform = _find_transform(img, shape, det_params, marker_template)
+        if transform is not None:
+            transforms.append(transform)
+    transforms.sort(key=lambda t: t.similarity, reverse=True)
+    pyutils.toc('find_marker-projective')#TODO remove
+    if len(transforms) > 0:
+        if vis is not None:
+            cv2.drawContours(vis, [transforms[0].shape['hull']], 0, (200, 0, 200), 3)
+    # print('TPL CORNERS:', [c.int_repr() for c in corners])
+    # print('SORTED:', [c.int_repr() for c in patterns.sort_points_ccw(corners)])
     # print('barycenter:', patterns.center(corners))
     imvis.imshow(vis, title='contours', wait_ms=-1)
