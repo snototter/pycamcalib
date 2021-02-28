@@ -167,8 +167,10 @@ def find_marker(img, pattern_specs, det_params=ContourDetectionParams()):
             warped = cv2.warpPerspective(img, retval,
                                         (det_params.marker_template_size_px,
                                          det_params.marker_template_size_px))
-            print('FOO warped:', warped.shape)
-            imvis.imshow(warped, 'WARPED', wait_ms=-1)
+            print('FOO warped:', warped.shape, 'is None:', warped is None)
+            x = imutils.concat(warped, marker_template.template_img, horizontal=False)
+            y = imutils.rotate270(x)
+            imvis.imshow(y, 'W+TPL', wait_ms=-1)
             # 450,450)
         else:
             print('TODO!!!!! compute intersections, fit lines, take longest edge as reference....')
