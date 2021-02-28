@@ -160,13 +160,15 @@ def find_marker(img, pattern_specs, det_params=ContourDetectionParams()):
             img_corners = sort_points_ccw([Point(x=pt[0, 0], y=pt[0, 1]) for pt in shape['hull']])
             print(img_corners )
             
-            corrds_src = points2numpy(img_corners)
-            coords_dst = points2numpy(det_params.marker_corners)
-            retval = cv2.getPerspectiveTransform(src, dst)
+            coords_src = points2numpy(img_corners)
+            coords_dst = points2numpy(marker_template.marker_corners)
+            retval = cv2.getPerspectiveTransform(coords_src, coords_dst)
             print('RETVAL getPerspectiveTransform: ', retval)
-            warp = cv2.warpPerspective(img, retval,
-                           (det_params.marker_template_size_px,
-                            det_params.marker_template_size_px))
+            warped = cv2.warpPerspective(img, retval,
+                                        (det_params.marker_template_size_px,
+                                         det_params.marker_template_size_px))
+            print('FOO warped:', warped.shape)
+            imvis.imshow(warped, 'WARPED', wait_ms=-1)
             # 450,450)
         else:
             print('TODO!!!!! compute intersections, fit lines, take longest edge as reference....')
