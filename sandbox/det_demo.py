@@ -80,8 +80,6 @@ def contour(img):
         # if i < 15:
             # print('Largest', i, approx['approx'], approx['area'])
             # imvis.imshow(vis, title='contours', wait_ms=-1)
-
-
     imvis.imshow(vis, title='contours', wait_ms=-1)
 
 #https://stackoverflow.com/questions/57767518/detecting-white-blobs-on-grayscale-image-using-mser-in-opencv
@@ -114,20 +112,17 @@ def fld_lines(img):
 def det_demo(imgs):
     for img in imgs:
         # fld_lines(img)
-        # hough_lines(img)
+        hough_lines(img)
         contour(img)
-        # mser(img)
+        mser(img)
 
 
 if __name__ == '__main__':
     pattern_specs = patterns.eddie.PatternSpecificationEddie('dummy',
         target_width_mm=210, target_height_mm=297,
-        dia_circles_mm=5, dist_circles_mm=11, bg_color='orange')
-    # patterns.eddie.ContourDetectionParams().get_marker_template(pattern_specs)
-
+        dia_circles_mm=5, dist_circles_mm=11)#, bg_color='orange')
     # Match template:
     # #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
-
     imgs = load_images()
     for img in imgs:
         patterns.eddie.find_marker(img, pattern_specs)
