@@ -70,7 +70,9 @@ class ContourDetectionParams:
 
     # Acceptance threshold on the normalized correlation coefficient [-1, +1]
     marker_ccoeff_thresh: float = 0.9 #TODO doc
-    marker_min_width_px: int = None
+    marker_min_width_px: int = None #TODO doc
+    grid_ccoeff_thresh: float = 0.8 #TODO doc
+    debug: bool = True
 
     # def __post_init__(self):
     #     self._calibration_tpl = dict()
@@ -114,13 +116,15 @@ def _ensure_quadrilateral(shape):
         return shape
     #TODO is there a robust way to approximate a quad via line intersection?
     # what if the longest edge is not on the opposite side of the clipping image border/occluder?
-    # Find the longest edge
-    pts = [Point(x=pt[0, 0], y=pt[0, 1]) for pt in shape['hull']]
-    edges = [(pts[idx], pts[(idx+1) % len(pts)]) for idx in range(len(pts))]
-    edge_lengths = np.array([e[0].distance(e[1]) for e in edges])
-    idx_longest = np.argmax(edge_lengths)
-    # print('EDGE LENGTHS', edge_lengths, idx_longest)
-
+    #
+    # TODO as of now, this is just a nice-to-have functionality (lowest priority)
+    #
+    # # Find the longest edge
+    # pts = [Point(x=pt[0, 0], y=pt[0, 1]) for pt in shape['hull']]
+    # edges = [(pts[idx], pts[(idx+1) % len(pts)]) for idx in range(len(pts))]
+    # edge_lengths = np.array([e[0].distance(e[1]) for e in edges])
+    # idx_longest = np.argmax(edge_lengths)
+    # # print('EDGE LENGTHS', edge_lengths, idx_longest)
     return None
 
 
@@ -184,7 +188,6 @@ def _md_find_shape_candidates(det_params, preprocessed, vis_img=None):
 def _find_transform(preprocessed, candidate, det_params, calibration_template):
     """Tries to find the homography between the calibration template and the given
     quadrilateral candidate."""
-    debug = True
     # Ensure that both img and marker points are in the same (CCW) order
     img_corners = sort_points_ccw([Point(x=pt[0, 0], y=pt[0, 1]) for pt in candidate['hull']])
     coords_dst = points2numpy(calibration_template.refpts_cropped_marker)
@@ -201,7 +204,7 @@ def _find_transform(preprocessed, candidate, det_params, calibration_template):
     # This just takes 0.6-0.9ms in total (!), so no use in premature optimization.
     # Alternative ideas: sum reduction, profile comparison (e.g. via earth mover's distance or
     # even just L1), choose orientation with minimum "sum profile" difference.
-    if debug:
+    if det_params.debug:
         vis_img = calibration_template.tpl_cropped_marker.copy()
     transforms = [imutils.noop, imutils.rotate90,
                   imutils.rotate180, imutils.rotate270]
@@ -211,13 +214,13 @@ def _find_transform(preprocessed, candidate, det_params, calibration_template):
         rotated = fx(warped)
         res = cv2.matchTemplate(rotated, calibration_template.tpl_cropped_marker, cv2.TM_CCOEFF_NORMED)
         similarities[idx] = res[0, 0]
-        if debug:
+        if det_params.debug:
             highlight_str = ' ***' if similarities[idx] > det_params.marker_ccoeff_thresh else ''
             print(f'orientation: {idx*90:3d}, similarity: {res.item(0):6.3f}{highlight_str}')
             vis_img = imutils.concat(vis_img, rotated, horizontal=True)
     best_idx = np.argmax(similarities)
     if similarities[best_idx] > det_params.marker_ccoeff_thresh:
-        if debug:
+        if det_params.debug:
             imvis.imshow(vis_img, 'Templated + Warped Candidate', wait_ms=100) #TODO remove
         first_idx = 3 - best_idx
         rotated_corners = [img_corners[(first_idx + i) % 4] for i in range(4)]
@@ -229,7 +232,6 @@ def _find_transform(preprocessed, candidate, det_params, calibration_template):
 
 
 def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
-    debug = True
     ctpl = pattern_specs.calibration_template  # Alias
     coords_dst = points2numpy(ctpl.refpts_full_marker)
     coords_src = points2numpy(transform.marker_corners)
@@ -242,9 +244,9 @@ def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
                                       H, (w, h), cv2.INTER_NEAREST)
 
     ncc = cv2.matchTemplate(warped_img, ctpl.tpl_cropped_circle, cv2.TM_CCOEFF_NORMED)  # mask must be template size??
-    ncc[ncc < 0.7] = 0
+    ncc[ncc < det_params.grid_ccoeff_thresh] = 0
 
-    if debug:
+    if det_params.debug:
         overlay = imutils.ensure_c3(imvis.overlay(ctpl.tpl_full, 0.3, warped_img, warped_mask))
         warped_img_corners = pru.apply_projection(H, points2numpy(image_corners(preproc.thresholded), Nx2=False))
         for i in range(4):
@@ -252,11 +254,21 @@ def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
             pt2 = numpy2cvpt(warped_img_corners[:, (i+1)%4])
             cv2.line(overlay, pt1, pt2, color=(0, 0, 255), thickness=3)
 
+        #FIXME FIXME FIXME
+        # Idea: detect blobs in thresholded NCC
+        # barycenter/centroid of each blob gives the top-left corner (then compute the relative offset to get the initial corner guess)
         tpl = ctpl.tpl_cropped_circle
-        y,x = np.unravel_index(ncc.argmax(), ncc.shape)
-        cv2.rectangle(overlay, (x, y), (x+tpl.shape[1], y+tpl.shape[0]), (255, 0, 255))
-        imvis.imshow(imvis.pseudocolor(ncc, [-1, 1]), 'NCC Result', wait_ms=10)
-        imvis.imshow(overlay, 'Projected image', wait_ms=10)
+        for niter in range(300):
+            y, x = np.unravel_index(ncc.argmax(), ncc.shape)
+            cv2.rectangle(overlay, (x, y), (x+tpl.shape[1], y+tpl.shape[0]), (255, 0, 255))
+            left = x - tpl.shape[1] // 2
+            right = left + tpl.shape[1]
+            top = y - tpl.shape[0] // 2
+            bottom = top + tpl.shape[0]
+            ncc[top:bottom, left:right] = 0
+            if niter % 10 == 0:
+                imvis.imshow(imvis.pseudocolor(ncc, [-1, 1]), 'NCC Result', wait_ms=10)
+                imvis.imshow(overlay, 'Projected image', wait_ms=10)
 
     if vis is not None:
         cv2.drawContours(vis, [transform.shape['hull']], 0, (200, 0, 200), 3)
@@ -266,10 +278,9 @@ def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
 #TODO refactor (e.g. input images iterable, compute tpl once, ...)
 #TODO what to return? ==> matching points
 def find_target(img, pattern_specs, det_params=ContourDetectionParams()):
-    debug = True
     # pyutils.tic('img-preprocessing')#TODO remove
     preprocessed = _md_preprocess_img(img, det_params)    
-    if debug:    
+    if det_params.debug:
         from vito import imvis
         vis = imutils.ensure_c3(preprocessed.gray)
     # pyutils.toc('img-preprocessing')#TODO remove - 20-30ms
@@ -288,5 +299,5 @@ def find_target(img, pattern_specs, det_params=ContourDetectionParams()):
     # pyutils.toc('center-verification-projective')#TODO remove
     if len(transforms) > 0:
         _find_grid(preprocessed, transforms[0], pattern_specs, det_params, vis=vis)
-    if debug:
+    if det_params.debug:
         imvis.imshow(vis, title='contours', wait_ms=-1)
