@@ -176,6 +176,7 @@ def _md_find_shape_candidates(det_params, preprocessed, vis_img=None):
 def _find_transform(preprocessed, candidate, det_params, calibration_template):
     """Tries to find the homography between the calibration template and the given
     quadrilateral candidate."""
+    debug = True
     # Ensure that both img and marker points are in the same (CCW) order
     img_corners = sort_points_ccw([Point(x=pt[0, 0], y=pt[0, 1]) for pt in candidate['hull']])
     coords_dst = points2numpy(calibration_template.refpts_cropped_marker)
@@ -192,7 +193,8 @@ def _find_transform(preprocessed, candidate, det_params, calibration_template):
     # This just takes 0.6-0.9ms in total (!), so no use in premature optimization.
     # Alternative ideas: sum reduction, profile comparison (e.g. via earth mover's distance or
     # even just L1), choose orientation with minimum "sum profile" difference.
-    vis_img = calibration_template.tpl_cropped_marker.copy()
+    if debug:
+        vis_img = calibration_template.tpl_cropped_marker.copy()
     transforms = [imutils.noop, imutils.rotate90,
                   imutils.rotate180, imutils.rotate270]
     similarities = np.zeros((len(transforms),))
@@ -201,12 +203,14 @@ def _find_transform(preprocessed, candidate, det_params, calibration_template):
         rotated = fx(warped)
         res = cv2.matchTemplate(rotated, calibration_template.tpl_cropped_marker, cv2.TM_CCOEFF_NORMED)
         similarities[idx] = res[0, 0]
-        highlight_str = ' ***' if similarities[idx] > det_params.marker_ccoeff_thresh else ''
-        print(f'orientation: {idx*90:3d}, similarity: {res.item(0):6.3f}{highlight_str}')
-        vis_img = imutils.concat(vis_img, rotated, horizontal=False)
+        if debug:
+            highlight_str = ' ***' if similarities[idx] > det_params.marker_ccoeff_thresh else ''
+            print(f'orientation: {idx*90:3d}, similarity: {res.item(0):6.3f}{highlight_str}')
+            vis_img = imutils.concat(vis_img, rotated, horizontal=True)
     best_idx = np.argmax(similarities)
     if similarities[best_idx] > det_params.marker_ccoeff_thresh:
-        imvis.imshow(vis_img, 'Templated + Warped Candidate', wait_ms=100) #TODO remove
+        if debug:
+            imvis.imshow(vis_img, 'Templated + Warped Candidate', wait_ms=100) #TODO remove
         first_idx = 3 - best_idx
         rotated_corners = [img_corners[(first_idx + i) % 4] for i in range(4)]
         return Transform(shape=candidate, homography=H,
@@ -231,7 +235,7 @@ def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
 
     ncc = cv2.matchTemplate(warped_img, ctpl.tpl_cropped_circle, cv2.TM_CCOEFF_NORMED)  # mask must be template size??
     ncc[ncc < 0.7] = 0
-    
+
     if debug:
         overlay = imutils.ensure_c3(imvis.overlay(ctpl.tpl_full, 0.3, warped_img, warped_mask))
         warped_img_corners = pru.apply_projection(H, points2numpy(image_corners(preproc.thresholded), Nx2=False))
