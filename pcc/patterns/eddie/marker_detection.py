@@ -2,13 +2,16 @@ import cv2
 import logging
 import numpy as np
 from dataclasses import dataclass, field
-from vito import imutils, imvis, pyutils
+from vito import imutils, imvis, pyutils, cam_projections as pru
 from ..common import GridIndex, Rect, Point, sort_points_ccw, points2numpy
 
 @dataclass
-class MarkerTemplate:
-    template_img : np.ndarray = field(init=True, repr=False)
-    marker_corners : list
+class CalibrationTemplate:
+    tpl_img_full : np.ndarray = field(init=True, repr=False)
+    marker_corners_full : list
+    tpl_img_marker_crop : np.ndarray = field(init=True, repr=False)
+    marker_corners_crop : list
+    tpl_img_circle : np.ndarray = field(init=True, repr=False)
 
 
 @dataclass
@@ -17,6 +20,15 @@ class Transform:
     homography : np.ndarray = field(init=True, repr=False)
     similarity : float
     rotation_deg : int
+    marker_corners : list
+
+
+@dataclass
+class PreprocResult:
+    original: np.ndarray = field(init=True, repr=False)
+    gray: np.ndarray = field(init=True, repr=False)
+    thresholded: np.ndarray = field(init=True, repr=False)
+    edges: np.ndarray = field(init=True, repr=False)
 
 
 @dataclass
@@ -67,16 +79,15 @@ class ContourDetectionParams:
     # Acceptance threshold on the normalized correlation coefficient [-1, +1]
     marker_ccoeff_thresh: float = 0.9
 
-
-    _marker_tpl: dict() = field(init=False, repr=False)  # Stores already computed marker templates
+    _calibration_tpl: dict() = field(init=False, repr=False)  # Stores already computed calibration templates
 
     def __post_init__(self):
-        self._marker_tpl = dict()
+        self._calibration_tpl = dict()
 
-    def get_marker_template(self, pattern_specs):
+    def get_template(self, pattern_specs):
         """Returns the marker template."""
-        if pattern_specs.name not in self._marker_tpl:
-            # Relative position of central marker
+        if pattern_specs.name not in self._calibration_tpl:
+            # Relative position of the central marker
             marker_rect_relative, marker_rect_offset = \
                 pattern_specs.get_relative_marker_rect(self.marker_margin_mm)
             # Crop the central marker and resize to the configured template size
@@ -91,7 +102,7 @@ class ContourDetectionParams:
                                         self.marker_template_size_px),
                                 interpolation=cv2.INTER_LANCZOS4)
             # Compute the reference corners for homography estimation
-            ref_corners = [
+            ref_corners_crop = [
                         Point(x=marker_rect_offset.x*tpl_crop.shape[1],
                               y=marker_rect_offset.y*tpl_crop.shape[0]),
                         Point(x=tpl_crop.shape[1]-marker_rect_offset.x*tpl_crop.shape[1],
@@ -101,17 +112,45 @@ class ContourDetectionParams:
                         Point(x=marker_rect_offset.x*tpl_crop.shape[1],
                               y=tpl_crop.shape[0]-marker_rect_offset.y*tpl_crop.shape[0])]
             # Ensure that they're in CCW order, w.r.t. to their barycenter
-            ref_corners = sort_points_ccw(ref_corners)
+            ref_corners_crop = sort_points_ccw(ref_corners_crop)
+
+            ### Compute the reference corners for the full template
+            marker_rect_relative_full, _ = pattern_specs.get_relative_marker_rect(0)
+            tpl_roi_full = Rect(left=np.floor(tpl_w * marker_rect_relative_full.left),
+                top=np.floor(tpl_h * marker_rect_relative_full.top),
+                width=np.floor(tpl_w * marker_rect_relative_full.width),
+                height=np.floor(tpl_h * marker_rect_relative_full.height))
+            # Compute the reference corners for image warping
+            ref_corners_full = [tpl_roi_full.top_left, tpl_roi_full.bottom_left,
+                           tpl_roi_full.bottom_right, tpl_roi_full.top_right]
+            # Ensure that they're in CCW order, w.r.t. to their barycenter
+            ref_corners_full = sort_points_ccw(ref_corners_full)
+
+
+            #### Compute the circle template
+            circ_rect_relative, circ_offset = pattern_specs.get_relative_marker_circle()
+            tpl_roi_circ = Rect(left=np.floor(tpl_w * circ_rect_relative.left),
+                top=np.floor(tpl_h * circ_rect_relative.top),
+                width=np.floor(tpl_w * circ_rect_relative.width),
+                height=np.floor(tpl_h * circ_rect_relative.height))
+            tpl_crop_circ = imutils.crop(tpl_full, tpl_roi_circ.int_repr())
+            imvis.imshow(tpl_crop_circ, "CIRCLE????", wait_ms=-1)
+            # # Compute the reference corners for homography estimation
+            # ref_corners_crop = [
+            #             Point(x=marker_rect_offset.x*tpl_crop.shape[1],
+            #                   y=marker_rect_offset.y*tpl_crop.shape[0]),
+            #             Point(x=tpl_crop.shape[1]-marker_rect_offset.x*tpl_crop.shape[1],
+            #                   y=marker_rect_offset.y*tpl_crop.shape[0]),
+            #             Point(x=tpl_crop.shape[1]-marker_rect_offset.x*tpl_crop.shape[1],
+            #                   y=tpl_crop.shape[0]-marker_rect_offset.y*tpl_crop.shape[0]),
+            #             Point(x=marker_rect_offset.x*tpl_crop.shape[1],
+            #                   y=tpl_crop.shape[0]-marker_rect_offset.y*tpl_crop.shape[0])]
             
-            # for C in ref_corners:
-            #     cv2.circle(tpl_crop, (int(C.x), int(C.y)), 3, (255, 0, 0), 1)
-            # imvis.imshow(tpl_full, 'tpl', wait_ms=10)
-            # imvis.imshow(tpl_crop, 'cropped', wait_ms=-1)
-            # mtpl = {'template': tpl_crop, 'marker_corners': ref_corners}
-            # mtpl = {'template': tpl_crop, 'marker_corners': ref_corners}
-            self._marker_tpl[pattern_specs.name] = MarkerTemplate(
-                template_img=tpl_crop, marker_corners=ref_corners)
-        return self._marker_tpl[pattern_specs.name]
+            self._calibration_tpl[pattern_specs.name] = CalibrationTemplate(
+                tpl_img_full=tpl_full, marker_corners_full=ref_corners_full,
+                tpl_img_marker_crop=tpl_crop, marker_corners_crop=ref_corners_crop,
+                tpl_img_circle=imutils.crop(tpl_full, tpl_roi.int_repr()))#tpl_img_circle=tpl_crop_circ) #FIXME FIXME FIXME
+        return self._calibration_tpl[pattern_specs.name]
     # #TODO Note: SVG export is 3-channel png!
 
 
@@ -121,7 +160,7 @@ def _md_preprocess_img(img, det_params):
     gray = imutils.grayscale(img)
     #TODO     #https://docs.opencv.org/3.4/d4/d73/tutorial_py_contours_begin.html    #findcontours should find (was???) White on black! - didn't look into it, but both b-on-w and w-on-b worked similarly well
     # Need to check why both thresh_bin and thresh_bin_inv works!
-    _, bw = cv2.threshold(gray, 0.0, 255.0, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+    _, bw = cv2.threshold(gray, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
     # Blur if needed
     if det_params.edge_blur_kernel_size > 0:
         bw = cv2.blur(bw.copy(), (det_params.edge_blur_kernel_size,
@@ -135,7 +174,7 @@ def _md_preprocess_img(img, det_params):
         kernel = np.ones((det_params.edge_dilation_kernel_size,
                           det_params.edge_dilation_kernel_size), np.uint8)
         edges = cv2.dilate(edges, kernel, iterations=1)
-    return gray, edges
+    return PreprocResult(original=img, gray=gray, thresholded=bw, edges=edges)
 # TODO everything above should be refactored to a separate preproc module
 # from ..preprocessing import ??
 # or at least have a separate Preprocessing Class (must be configurable by a 
@@ -152,7 +191,7 @@ def _ensure_quadrilateral(shape):
     return None
 
 
-def _md_find_shape_candidates(det_params, marker_template, edges, vis_img=None):
+def _md_find_shape_candidates(det_params, edges, vis_img=None):
     """Locate candidate regions which could contain the marker."""
     # We don't want hierarchies of contours here, just the largest (i.e. the
     # root) contour of each hierarchy is fine:
@@ -200,12 +239,26 @@ def _md_find_shape_candidates(det_params, marker_template, edges, vis_img=None):
     return candidate_shapes, vis_img
 
 
-def _find_transform(img, candidate, det_params, marker_template):
-    """Tries to find the homography between the marker template and the given
+def _rotation(deg):
+    theta = np.deg2rad(deg)
+    ct = np.cos(theta)
+    st = np.sin(theta)
+    R = np.array([[ct, -st, 0], [st, ct, 0], [0, 0, 1]], dtype=np.float32)
+    print (R)
+    return R
+
+
+# def _concat_homography(T, H):
+#     H = H / H[2, 2]
+#     return pru.matmul(T, H)
+
+
+def _find_transform(img, candidate, det_params, calibration_template):
+    """Tries to find the homography between the calibration template and the given
     quadrilateral candidate."""
     # Ensure that both img and marker points are in the same (CCW) order
     img_corners = sort_points_ccw([Point(x=pt[0, 0], y=pt[0, 1]) for pt in candidate['hull']])
-    coords_dst = points2numpy(marker_template.marker_corners)
+    coords_dst = points2numpy(calibration_template.marker_corners_crop)
     coords_src = points2numpy(img_corners)
         
     H = cv2.getPerspectiveTransform(coords_src, coords_dst)
@@ -214,26 +267,68 @@ def _find_transform(img, candidate, det_params, marker_template):
     warped = cv2.warpPerspective(img, H, (det_params.marker_template_size_px,
                                           det_params.marker_template_size_px)) #TODO border pad zero, replicate? (the latter)
     # Naive matching: try each possible rotation:
-    vis_img = marker_template.template_img.copy()
+    vis_img = calibration_template.tpl_img_marker_crop.copy()
     pyutils.tic('naive')#TODO remove
     transforms = [imutils.noop, imutils.rotate90,
                   imutils.rotate180, imutils.rotate270]
     similarities = np.zeros((len(transforms),))
+    
     for idx, fx in zip(range(4), transforms):
         rotated = fx(warped)
-        res = cv2.matchTemplate(rotated, marker_template.template_img, cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(rotated, calibration_template.tpl_img_marker_crop, cv2.TM_CCOEFF_NORMED)
         similarities[idx] = res[0, 0]
         print(f'{idx:d}: {res.item(0)}')
         vis_img = imutils.concat(vis_img, rotated, horizontal=False)
     best_idx = np.argmax(similarities)
     pyutils.toc('naive')#TODO remove
-    imvis.imshow(vis_img, 'TPL+WARPED', wait_ms=300) #TODO remove
     if similarities[best_idx] > det_params.marker_ccoeff_thresh:
+        imvis.imshow(vis_img, 'TPL+WARPED', wait_ms=100) #TODO remove
+        first_idx = 3 - best_idx
+        rotated_corners = [img_corners[(first_idx + i) % 4] for i in range(4)]
         return Transform(shape=candidate, homography=H,
                          similarity=similarities[best_idx],
-                         rotation_deg=90*best_idx)
+                         rotation_deg=90*best_idx,
+                         marker_corners=rotated_corners)
     return None
 
+
+def _find_grid(preproc, transform, calibration_template, pattern_specs, det_params, vis=None):
+    coords_dst = points2numpy(calibration_template.marker_corners_full)
+    coords_src = points2numpy(transform.marker_corners)
+    H = cv2.getPerspectiveTransform(coords_src, coords_dst)
+    if H is None:
+        return vis
+    h, w = calibration_template.tpl_img_full.shape[:2]
+    warped_img = cv2.warpPerspective(preproc.original, H, (w, h), cv2.INTER_CUBIC)
+    warped_mask = cv2.warpPerspective(np.ones(preproc.original.shape[:2], dtype=np.uint8),
+                                      H, (w, h), cv2.INTER_NEAREST)
+    overlay = imvis.overlay(calibration_template.tpl_img_full, 0.3, warped_img, warped_mask) #FIXME add mask
+
+    #TODO tpl = circle template #FIXME use circle template
+    # ncc = cv2.matchTemplate(warped_img, calibration_template.tpl_img_circle, cv2.TM_CCOEFF_NORMED)  # mask must be template size??
+    ncc = cv2.matchTemplate(warped_img, calibration_template.tpl_img_circle, cv2.TM_CCOEFF_NORMED)  # mask must be template size??
+
+    # # print(ncc.shape, ncc.dtype, np.min(ncc[:]), np.max(ncc[:]), 'VS', warped_img.shape, 'VS TPL:', calibration_template.tpl_img_marker_crop.shape)
+    # vis_crop=[0, 0, ncc.shape[1], ncc.shape[0]]
+    # match_crop = imutils.crop(calibration_template.tpl_img_full, vis_crop)
+    # # print(match_crop.shape, 'MASK:', warped_mask.shape, warped_mask.dtype)
+    vis_ncc = np.zeros(warped_mask.shape)
+    tpl = calibration_template.tpl_img_circle
+    imvis.imshow(tpl, "CIRCLE TMPL", wait_ms=10)
+    # vis_ncc[tpl.shape[0]-1:, tpl.shape[1]-1:] = ncc
+    vis_ncc[:-tpl.shape[0]+1, :-tpl.shape[1]+1] = ncc
+    # overlay = imvis.overlay(calibration_template.tpl_img_full, 0.1, 
+    #     imvis.pseudocolor(vis_ncc), warped_mask) #FIXME add mask
+    overlay = imvis.overlay(calibration_template.tpl_img_full, 0.3,
+            warped_img, warped_mask)
+    y,x = np.unravel_index(ncc.argmax(), ncc.shape)
+    cv2.rectangle(overlay, (x, y), (x+tpl.shape[1], y+tpl.shape[0]), (255, 0, 255))
+    imvis.imshow(overlay, 'Projected image', wait_ms=10)
+
+#TODO calib_template: member template_marker, template_target
+    if vis is not None:
+        cv2.drawContours(vis, [transform.shape['hull']], 0, (200, 0, 200), 3)
+    return vis
 
 # improvement: sum reduce, chose best orientation
 #TODO refactor (e.g. input images iterable, compute tpl once, ...)
@@ -241,30 +336,30 @@ def _find_transform(img, candidate, det_params, marker_template):
 def find_marker(img, pattern_specs, det_params=ContourDetectionParams()):
     debug = True
     pyutils.tic('find_marker-preprocessing')#TODO remove
-    gray, edges = _md_preprocess_img(img, det_params)    
+    preprocessed = _md_preprocess_img(img, det_params)    
     if debug:    
         from vito import imvis
-        vis = imutils.ensure_c3(imvis.overlay(gray, 0.5, edges, edges))
+        vis = imutils.ensure_c3(preprocessed.gray)
+        # vis = imutils.ensure_c3(imvis.overlay(preprocessed.gray, 0.5, preprocessed.edges, preprocessed.edges))
     pyutils.toc('find_marker-preprocessing')#TODO remove
     pyutils.tic('find_marker-template')#TODO remove
-    marker_template = det_params.get_marker_template(pattern_specs)
+    calibration_template = det_params.get_template(pattern_specs)
     pyutils.toc('find_marker-template')#TODO remove
     pyutils.tic('find_marker-contours')#TODO remove
-    candidate_shapes, vis = _md_find_shape_candidates(det_params, marker_template, edges, vis)
+    candidate_shapes, vis = _md_find_shape_candidates(det_params, preprocessed.edges, vis)
     pyutils.toc('find_marker-contours')#TODO remove
     pyutils.tic('find_marker-projective')#TODO remove
     # Find best fitting candidate (if any)
     transforms = list()
     for shape in candidate_shapes:
         # Compute homography between marker template and detected candidate
-        transform = _find_transform(img, shape, det_params, marker_template)
+        transform = _find_transform(preprocessed.original, shape, det_params, calibration_template)
         if transform is not None:
             transforms.append(transform)
     transforms.sort(key=lambda t: t.similarity, reverse=True)
     pyutils.toc('find_marker-projective')#TODO remove
     if len(transforms) > 0:
-        if vis is not None:
-            cv2.drawContours(vis, [transforms[0].shape['hull']], 0, (200, 0, 200), 3)
+        _find_grid(preprocessed, transforms[0], calibration_template, pattern_specs, det_params, vis=vis)
     # print('TPL CORNERS:', [c.int_repr() for c in corners])
     # print('SORTED:', [c.int_repr() for c in patterns.sort_points_ccw(corners)])
     # print('barycenter:', patterns.center(corners))

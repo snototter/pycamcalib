@@ -13,7 +13,7 @@ from pcc import patterns
 
 
 def load_images():
-    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in [0, 1, 6]]#range(6)]
+    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in range(6)] #[0, 1, 6]]
 
 def hough_lines(img):
     g = imutils.grayscale(img)
@@ -121,8 +121,11 @@ if __name__ == '__main__':
     ptl = [patterns.Point(0, 1), patterns.Point(0, 2), patterns.Point(0, 3), patterns.Point(0, 4), patterns.Point(0, 5), patterns.Point(-3, 0), patterns.Point(-2, 0)]
     print(patterns.sort_points_ccw(ptl, patterns.Point(0, 0)))
     print(patterns.sort_points_ccw(ptl, patterns.Point(0, 0), reverse=True))
-    pattern_specs = patterns.eddie.PatternSpecificationEddie('dummy',
-        target_width_mm=210, target_height_mm=297,
+    # pattern_specs = patterns.eddie.PatternSpecificationEddie('dummy',
+    #     target_width_mm=210, target_height_mm=297,
+    #     dia_circles_mm=5, dist_circles_mm=11)#, bg_color='orange')
+    pattern_specs = patterns.eddie.PatternSpecificationEddie('alu',
+        target_width_mm=310, target_height_mm=410,
         dia_circles_mm=5, dist_circles_mm=11)#, bg_color='orange')
     # Match template:
     # #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be

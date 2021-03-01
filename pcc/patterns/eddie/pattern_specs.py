@@ -248,6 +248,28 @@ class PatternSpecificationEddie:
         img_mem_file = io.BytesIO()
         renderPM.drawToFile(dwg_input, img_mem_file, fmt="PNG")
         return imutils.memory_file2ndarray(img_mem_file)
+    
+    def get_relative_marker_circle(self):
+        #TODO
+        #return an arbitrary circle template
+        #### V1 single circle
+        gidx = GridIndex(1, 1)
+        mx, my = self.computed_margins
+
+        offset_x = mx + self.r_circles_mm
+        offset_y = my + self.r_circles_mm
+        margin_mm = self.dist_circles_mm / 2
+        wh = self.dist_circles_mm + self.dia_circles_mm + 2*margin_mm#FIXME
+
+        top = gidx.row * self.dist_circles_mm + offset_y - self.r_circles_mm - margin_mm
+        left = gidx.col * self.dist_circles_mm + offset_x - self.r_circles_mm - margin_mm
+        rect = Rect(left=left/self.target_width_mm, top=top/self.target_height_mm,
+                    width=wh/self.target_width_mm,
+                    height=wh/self.target_height_mm)
+        offset = Point(x=margin_mm/wh,
+                       y=margin_mm/wh)
+        return rect, offset
+
 
     def get_relative_marker_rect(self, margin_mm):
         """

@@ -27,6 +27,22 @@ _Rect = namedtuple('_Rect', 'left top width height')
 
 class Rect(_Rect):
     """Represents a rectangle."""
+    @property
+    def top_left(self):
+        return Point(x=self.left, y=self.top)
+
+    @property
+    def top_right(self):
+        return Point(x=self.left+self.width, y=self.top)
+    
+    @property
+    def bottom_right(self):
+        return Point(x=self.left+self.width, y=self.top+self.height)
+    
+    @property
+    def bottom_left(self):
+        return Point(x=self.left, y=self.top+self.height)
+
     def int_repr(self):
         """Returns a list representation [left, top, width, height] with all values truncated to integers."""
         return [int(x) for x in [self.left, self.top, self.width, self.height]]
