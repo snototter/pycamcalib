@@ -22,11 +22,14 @@ class Point:
         return np.sqrt((pt.x - self.x)**2 + (pt.y - self.y)**2)
 
 
-_Rect = namedtuple('_Rect', 'left top width height')
-
-
-class Rect(_Rect):
+@dataclass
+class Rect:
     """Represents a rectangle."""
+    left: float
+    top: float
+    width: float
+    height: float
+
     @property
     def top_left(self):
         return Point(x=self.left, y=self.top)
@@ -46,6 +49,13 @@ class Rect(_Rect):
     def int_repr(self):
         """Returns a list representation [left, top, width, height] with all values truncated to integers."""
         return [int(x) for x in [self.left, self.top, self.width, self.height]]
+    
+    def ensure_odd_size(self):
+        """Adjusts the width & height s.t. the width and height are odd."""
+        if int(self.width) % 2 == 0:
+            self.width += 1
+        if int(self.height) % 2 == 0:
+            self.height += 1
 
 
 class SpecificationError(Exception):
@@ -75,6 +85,7 @@ def ccw_cmp(pt_ref, pt1, pt2):
                 - (pt1.y - pt_ref.y)*(pt2.x - pt_ref.x)
     if area_rect == 0:
         # All three points are collinear. Thus, sort pt1 and pt2 by their distance to ref:
+        #FIXME verify collinear case on paper!!!
         if pt_ref.distance(pt1) < pt_ref.distance(pt2):
             return 1
         else:
@@ -101,6 +112,7 @@ def sort_points_ccw(pt_list, pt_ref=None, reverse=False):
 
 def points2numpy(pt_list):
     #TODO asert or return error code (maybe later)
+    # opencv bindings require list of opints to be Nx2 dimensional ndarrays
     assert pt_list is not None
     assert len(pt_list) > 0
     npp = np.zeros((len(pt_list), 2), dtype=np.float32)

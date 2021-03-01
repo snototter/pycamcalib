@@ -1,14 +1,26 @@
 import logging
 import io
 import svgwrite
+import cv2
+import numpy as np
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 from dataclasses import dataclass, field
-from vito import imutils
-from ..common import GridIndex, Rect, Point
+from vito import imutils, imvis
+from ..common import GridIndex, Rect, Point, sort_points_ccw, center, SpecificationError
 
 #TODO add member for default file location (within the package once we deploy it)
 # this would allow loading svg/png w/o rendering first...
+
+@dataclass
+class CalibrationTemplate:
+    tpl_full: np.ndarray = field(init=True, repr=False)
+    refpts_full_marker: list
+    tpl_cropped_marker: np.ndarray = field(init=True, repr=False)
+    refpts_cropped_marker: list
+    tpl_cropped_circle: np.ndarray = field(init=True, repr=False)
+    refpts_cropped_circle: list
+
 
 @dataclass(frozen=True)
 class PatternSpecificationEddie:
@@ -75,6 +87,9 @@ class PatternSpecificationEddie:
     min_margin_target_mm: int = 5
     bg_color: str = 'white'
     fg_color: str = 'black'
+    template_marker_size_px: int = 64 # FIXME doc
+    template_marker_margin_mm: int = 3 # FIXME doc
+
 
     # Automatically calculated attributes
     r_circles_mm : float = field(init=False, repr=False)
@@ -84,6 +99,7 @@ class PatternSpecificationEddie:
     square_topleft_corner: GridIndex = field(init=False, repr=False)
     marker_size_mm: int = field(init=False, repr=False)
     marker_thickness_mm: int = field(init=False, repr=False)
+    calibration_template: CalibrationTemplate = field(init=False, repr=False)
 
     def __post_init__(self):
         # If the dataclass is frozen, we cannot set the computed values directly (https://stackoverflow.com/a/54119384/400948)
@@ -95,6 +111,7 @@ class PatternSpecificationEddie:
         self._compute_square_topleft()
         self._compute_skipped_circles()
         self._verify()
+        self._compute_calibration_template()
 
     def _verify(self):
         # Circles mustn't touch
@@ -246,33 +263,57 @@ class PatternSpecificationEddie:
         # Render it to PNG in-memory
         dwg_input = svg2rlg(svg_sio)
         img_mem_file = io.BytesIO()
-        renderPM.drawToFile(dwg_input, img_mem_file, fmt="PNG")
+        renderPM.drawToFile(dwg_input, img_mem_file, fmt="PNG")  # NEVER EVER SET DPI! doesn't scale properly as of 2021-03
         return imutils.memory_file2ndarray(img_mem_file)
-    
-    def get_relative_marker_circle(self):
+
+    def _get_relative_marker_circle_v1(self):
         #TODO
         #return an arbitrary circle template
         #### V1 single circle
         gidx = GridIndex(1, 1)
         mx, my = self.computed_margins
+        # Choose (almost) any template size (increase if you want more circles, decrease at will)
+        tpl_size_mm = 2 * self.dia_circles_mm  
 
-        offset_x = mx + self.r_circles_mm
-        offset_y = my + self.r_circles_mm
-        margin_mm = self.dist_circles_mm / 2
-        wh = self.dist_circles_mm + self.dia_circles_mm + 2*margin_mm #4 circles seem to be more robust for refinement
-        # wh = self.dia_circles_mm + 2*margin_mm # Single dot
+        cx = mx + self.r_circles_mm + gidx.col * self.dist_circles_mm
+        cy = my + self.r_circles_mm + gidx.row * self.dist_circles_mm
 
-        top = gidx.row * self.dist_circles_mm + offset_y - self.r_circles_mm - margin_mm
-        left = gidx.col * self.dist_circles_mm + offset_x - self.r_circles_mm - margin_mm
-        rect = Rect(left=left/self.target_width_mm, top=top/self.target_height_mm,
-                    width=wh/self.target_width_mm,
-                    height=wh/self.target_height_mm)
-        offset = Point(x=margin_mm/wh,
-                       y=margin_mm/wh)
-        return rect, offset
+        left = cx - tpl_size_mm / 2
+        top = cy - tpl_size_mm / 2
+
+        rect = Rect(left=left / self.target_width_mm, top=top / self.target_height_mm,
+                    width=tpl_size_mm / self.target_width_mm, height=tpl_size_mm / self.target_height_mm)
+        tpl_ref_pts = [Point(x=(cx - left) / tpl_size_mm, y=(cy - top) / tpl_size_mm)]
+        return rect, tpl_ref_pts
+    
+    def _get_relative_marker_circle_v2(self):
+        #TODO
+        #return an arbitrary circle template
+        #### V2 4 circles (yielding 5 reference points would lead to highly redundant matches - only ref center for now!!!)
+        gidx = GridIndex(1.5, 1.5)
+        mx, my = self.computed_margins
+
+        # Offsets to the first circle's center:
+        first_center_offset_x = mx + self.r_circles_mm
+        first_center_offset_y = my + self.r_circles_mm
+
+        padding_mm = 2#self.dist_circles_mm / 2
+        # # tpl_size_mm = 2 * self.dia_circles_mm  # Choose (almost) any template size (increase if you want more circles, decrease at will)
+
+        cx = first_center_offset_x + gidx.col * self.dist_circles_mm
+        cy = first_center_offset_y + gidx.row * self.dist_circles_mm
+        
+        tpl_size_mm = 2*padding_mm + self.dia_circles_mm + self.dist_circles_mm
+        left = cx - tpl_size_mm / 2
+        top = cy - tpl_size_mm / 2
+        
+        rect = Rect(left=left / self.target_width_mm, top=top / self.target_height_mm,
+                    width=tpl_size_mm / self.target_width_mm, height=tpl_size_mm / self.target_height_mm)
+        tpl_ref_pts = [Point(x=0.5, y=0.5)]
+        return rect, tpl_ref_pts
 
 
-    def get_relative_marker_rect(self, margin_mm):
+    def _get_relative_marker_rect(self, margin_mm):
         """
         Returns the center marker's position as a fraction of the calibration
         target's dimensions.
@@ -294,6 +335,86 @@ class PatternSpecificationEddie:
         offset = Point(x=margin_mm/(self.marker_size_mm + 2*margin_mm),
                        y=margin_mm/(self.marker_size_mm + 2*margin_mm))
         return rect, offset
+    
+    def _compute_calibration_template(self):
+        """Precomputes the calibration template image and reference points."""
+        # Render full template
+        tpl_full = imutils.grayscale(self.render_image())  # The rendered PNG will have 3-channels
+        tpl_h, tpl_w = tpl_full.shape[:2]
+
+        # Compute center marker position relative to the full target
+        relrect_marker_tight, _ = self._get_relative_marker_rect(0)
+        marker_roi_tight = Rect(
+                left=tpl_w * relrect_marker_tight.left,
+                top=tpl_h * relrect_marker_tight.top,
+                width=tpl_w * relrect_marker_tight.width,
+                height=tpl_h * relrect_marker_tight.height)
+        # Compute the corresponding corners for homography estimation (full
+        # image warping) and ensure that they are sorted in CCW order
+        ref_pts_marker_absolute = sort_points_ccw([
+                marker_roi_tight.top_left,
+                marker_roi_tight.bottom_left,
+                marker_roi_tight.bottom_right,
+                marker_roi_tight.top_right])
+
+        # Crop the central marker (with some small margin) and resize
+        # to the configured template size
+        relrect_marker_padded, rmr_offset = \
+            self._get_relative_marker_rect(self.template_marker_margin_mm)
+        marker_roi_padded = Rect(
+                left=tpl_w * relrect_marker_padded.left,
+                top=tpl_h * relrect_marker_padded.top,
+                width=tpl_w * relrect_marker_padded.width,
+                height=tpl_h * relrect_marker_padded.height)
+        tpl_marker = cv2.resize(imutils.crop(tpl_full, marker_roi_padded.int_repr()),
+                                dsize=(self.template_marker_size_px,
+                                       self.template_marker_size_px),
+                                interpolation=cv2.INTER_CUBIC)
+        # Compute the reference corners for homography estimation and ensure that
+        # they are sorted in CCW order
+        ref_pts_tpl_marker = sort_points_ccw([
+                Point(x=rmr_offset.x * tpl_marker.shape[1],
+                      y=rmr_offset.y * tpl_marker.shape[0]),
+                Point(x=tpl_marker.shape[1] - rmr_offset.x * tpl_marker.shape[1],
+                      y=rmr_offset.y * tpl_marker.shape[0]),
+                Point(x=tpl_marker.shape[1] - rmr_offset.x * tpl_marker.shape[1],
+                      y=tpl_marker.shape[0] - rmr_offset.y * tpl_marker.shape[0]),
+                Point(x=rmr_offset.x * tpl_marker.shape[1],
+                      y=tpl_marker.shape[0] - rmr_offset.y * tpl_marker.shape[0])])
+
+        # Compute the circle template to locate the actual calibration reference
+        # points (i.e. the grid points)
+        relrect_circle, ref_pts_circle_relative = self._get_relative_marker_circle_v2()
+        circle_roi = Rect(
+            left=tpl_w * relrect_circle.left,
+            top=tpl_h * relrect_circle.top,
+            width=tpl_w * relrect_circle.width,
+            height=tpl_h * relrect_circle.height)
+        # Ensure the ROI is even (simplifies using the correlation results later on)
+        circle_roi.ensure_odd_size()
+        tpl_circle = imutils.crop(tpl_full, circle_roi.int_repr())
+        ref_pts_tpl_circle = [Point(x=pt.x * tpl_circle.shape[1],
+                                    y=pt.y * tpl_circle.shape[0]) for pt in ref_pts_circle_relative]
+
+        ###DEBUG VISUALS
+        # vis_tpl_circle = tpl_circle.copy()
+        # foo = imutils.ensure_c3(tpl_full.copy()) # FIXME REMOVE
+        # cv2.rectangle(foo, circle_roi.int_repr(), color=(0, 250, 0), thickness=3)
+        # for pt in ref_pts_tpl_circle:
+        #     cv2.circle(vis_tpl_circle, tuple(pt.int_repr()), radius=3, color=(200, 0, 0), thickness=1)
+        # imvis.imshow(foo, 'FOO', wait_ms=10)
+        # print(tpl_circle.shape, ref_pts_tpl_circle[0])
+        # imvis.imshow(vis_tpl_circle, "CIRCLE????", wait_ms=-1)
+
+        object.__setattr__(self, 'calibration_template', CalibrationTemplate(
+                                        tpl_full=tpl_full,
+                                        refpts_full_marker=ref_pts_marker_absolute,
+                                        #TODO extract reference points!!!! grid
+                                        tpl_cropped_marker=tpl_marker,
+                                        refpts_cropped_marker=ref_pts_tpl_marker,
+                                        tpl_cropped_circle=tpl_circle,
+                                        refpts_cropped_circle=ref_pts_tpl_circle,
+                                    ))
 
 
 """Test pattern for development."""

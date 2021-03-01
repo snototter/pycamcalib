@@ -125,13 +125,14 @@ if __name__ == '__main__':
     #     target_width_mm=210, target_height_mm=297,
     #     dia_circles_mm=5, dist_circles_mm=11)#, bg_color='orange')
     pattern_specs = patterns.eddie.PatternSpecificationEddie('alu',
-        target_width_mm=310, target_height_mm=410,
+        target_width_mm=315, target_height_mm=410,
         dia_circles_mm=5, dist_circles_mm=11)#, bg_color='orange')
     # Match template:
     # #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
     imgs = load_images()
     for img in imgs:
-        patterns.eddie.find_marker(img, pattern_specs)
+        print('\n\nNEXT IMAGE--------------------------------------------------------------------------\n')
+        patterns.eddie.find_target(img, pattern_specs)
     # det_demo(imgs)
 
 
