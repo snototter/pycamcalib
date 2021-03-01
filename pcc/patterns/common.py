@@ -110,13 +110,33 @@ def sort_points_ccw(pt_list, pt_ref=None, reverse=False):
                   reverse=reverse)
 
 
-def points2numpy(pt_list):
+def image_corners(x):
+    if isinstance(x, np.ndarray):
+        height, width = x.shape[:2]
+    elif isinstance(x, list) or isinstance(x, tuple):
+        width, height = x[:2]
+    else:
+        raise RuntimeError('Cannot interpret input (must be either np.ndarray, list, or tuple)')
+    return [Point(0, 0), Point(width, 0), Point(width, height), Point(0, height)]
+
+
+def numpy2cvpt(nppt):
+    return (int(nppt[0]), int(nppt[1]))
+
+
+def points2numpy(pt_list, Nx2=True):
     #TODO asert or return error code (maybe later)
     # opencv bindings require list of opints to be Nx2 dimensional ndarrays
     assert pt_list is not None
     assert len(pt_list) > 0
-    npp = np.zeros((len(pt_list), 2), dtype=np.float32)
-    for idx in range(len(pt_list)):
-        npp[idx, 0] = pt_list[idx].x
-        npp[idx, 1] = pt_list[idx].y
+    if Nx2:
+        npp = np.zeros((len(pt_list), 2), dtype=np.float32)
+        for idx in range(len(pt_list)):
+            npp[idx, 0] = pt_list[idx].x
+            npp[idx, 1] = pt_list[idx].y
+    else:
+        npp = np.zeros((2, len(pt_list)), dtype=np.float32)
+        for idx in range(len(pt_list)):
+            npp[0, idx] = pt_list[idx].x
+            npp[1, idx] = pt_list[idx].y
     return npp

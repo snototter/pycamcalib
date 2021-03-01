@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from dataclasses import dataclass, field
 from vito import imutils, imvis, pyutils, cam_projections as pru
-from ..common import GridIndex, Rect, Point, sort_points_ccw, points2numpy
+from ..common import GridIndex, Rect, Point, sort_points_ccw, points2numpy, image_corners, numpy2cvpt
 
 
 @dataclass
@@ -217,6 +217,7 @@ def _find_transform(preprocessed, candidate, det_params, calibration_template):
 
 
 def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
+    debug = True
     ctpl = pattern_specs.calibration_template  # Alias
     coords_dst = points2numpy(ctpl.refpts_full_marker)
     coords_src = points2numpy(transform.marker_corners)
@@ -227,18 +228,23 @@ def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
     warped_img = cv2.warpPerspective(preproc.thresholded, H, (w, h), cv2.INTER_CUBIC)
     warped_mask = cv2.warpPerspective(np.ones(preproc.thresholded.shape[:2], dtype=np.uint8),
                                       H, (w, h), cv2.INTER_NEAREST)
-    overlay = imvis.overlay(ctpl.tpl_full, 0.3, warped_img, warped_mask) #FIXME add mask
 
     ncc = cv2.matchTemplate(warped_img, ctpl.tpl_cropped_circle, cv2.TM_CCOEFF_NORMED)  # mask must be template size??
     ncc[ncc < 0.7] = 0
+    
+    if debug:
+        overlay = imutils.ensure_c3(imvis.overlay(ctpl.tpl_full, 0.3, warped_img, warped_mask))
+        warped_img_corners = pru.apply_projection(H, points2numpy(image_corners(preproc.thresholded), Nx2=False))
+        for i in range(4):
+            pt1 = numpy2cvpt(warped_img_corners[:, i])
+            pt2 = numpy2cvpt(warped_img_corners[:, (i+1)%4])
+            cv2.line(overlay, pt1, pt2, color=(0, 0, 255), thickness=3)
 
-    tpl = ctpl.tpl_cropped_circle
-    overlay = imutils.ensure_c3(imvis.overlay(ctpl.tpl_full, 0.3,
-                                              warped_img, warped_mask))
-    y,x = np.unravel_index(ncc.argmax(), ncc.shape)
-    cv2.rectangle(overlay, (x, y), (x+tpl.shape[1], y+tpl.shape[0]), (255, 0, 255))
-    imvis.imshow(imvis.pseudocolor(ncc, [-1, 1]), 'NCC Result', wait_ms=10)
-    imvis.imshow(overlay, 'Projected image', wait_ms=10)
+        tpl = ctpl.tpl_cropped_circle
+        y,x = np.unravel_index(ncc.argmax(), ncc.shape)
+        cv2.rectangle(overlay, (x, y), (x+tpl.shape[1], y+tpl.shape[0]), (255, 0, 255))
+        imvis.imshow(imvis.pseudocolor(ncc, [-1, 1]), 'NCC Result', wait_ms=10)
+        imvis.imshow(overlay, 'Projected image', wait_ms=10)
 
     if vis is not None:
         cv2.drawContours(vis, [transform.shape['hull']], 0, (200, 0, 200), 3)
