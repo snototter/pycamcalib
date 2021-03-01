@@ -259,7 +259,8 @@ class PatternSpecificationEddie:
         offset_x = mx + self.r_circles_mm
         offset_y = my + self.r_circles_mm
         margin_mm = self.dist_circles_mm / 2
-        wh = self.dist_circles_mm + self.dia_circles_mm + 2*margin_mm#FIXME
+        wh = self.dist_circles_mm + self.dia_circles_mm + 2*margin_mm #4 circles seem to be more robust for refinement
+        # wh = self.dia_circles_mm + 2*margin_mm # Single dot
 
         top = gidx.row * self.dist_circles_mm + offset_y - self.r_circles_mm - margin_mm
         left = gidx.col * self.dist_circles_mm + offset_x - self.r_circles_mm - margin_mm

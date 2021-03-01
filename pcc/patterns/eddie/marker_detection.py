@@ -134,7 +134,7 @@ class ContourDetectionParams:
                 width=np.floor(tpl_w * circ_rect_relative.width),
                 height=np.floor(tpl_h * circ_rect_relative.height))
             tpl_crop_circ = imutils.crop(tpl_full, tpl_roi_circ.int_repr())
-            imvis.imshow(tpl_crop_circ, "CIRCLE????", wait_ms=-1)
+            # imvis.imshow(tpl_crop_circ, "CIRCLE????", wait_ms=-1)
             # # Compute the reference corners for homography estimation
             # ref_corners_crop = [
             #             Point(x=marker_rect_offset.x*tpl_crop.shape[1],
@@ -149,7 +149,8 @@ class ContourDetectionParams:
             self._calibration_tpl[pattern_specs.name] = CalibrationTemplate(
                 tpl_img_full=tpl_full, marker_corners_full=ref_corners_full,
                 tpl_img_marker_crop=tpl_crop, marker_corners_crop=ref_corners_crop,
-                tpl_img_circle=imutils.crop(tpl_full, tpl_roi.int_repr()))#tpl_img_circle=tpl_crop_circ) #FIXME FIXME FIXME
+                # tpl_img_circle=imutils.crop(tpl_full, tpl_roi.int_repr())) ##FIXME - ncc works
+                tpl_img_circle=tpl_crop_circ) #FIXME FIXME FIXME
         return self._calibration_tpl[pattern_specs.name]
     # #TODO Note: SVG export is 3-channel png!
 
@@ -305,24 +306,20 @@ def _find_grid(preproc, transform, calibration_template, pattern_specs, det_para
     overlay = imvis.overlay(calibration_template.tpl_img_full, 0.3, warped_img, warped_mask) #FIXME add mask
 
     #TODO tpl = circle template #FIXME use circle template
-    # ncc = cv2.matchTemplate(warped_img, calibration_template.tpl_img_circle, cv2.TM_CCOEFF_NORMED)  # mask must be template size??
     ncc = cv2.matchTemplate(warped_img, calibration_template.tpl_img_circle, cv2.TM_CCOEFF_NORMED)  # mask must be template size??
+    ncc[ncc < 0.7] = 0
 
-    # # print(ncc.shape, ncc.dtype, np.min(ncc[:]), np.max(ncc[:]), 'VS', warped_img.shape, 'VS TPL:', calibration_template.tpl_img_marker_crop.shape)
-    # vis_crop=[0, 0, ncc.shape[1], ncc.shape[0]]
-    # match_crop = imutils.crop(calibration_template.tpl_img_full, vis_crop)
-    # # print(match_crop.shape, 'MASK:', warped_mask.shape, warped_mask.dtype)
-    vis_ncc = np.zeros(warped_mask.shape)
     tpl = calibration_template.tpl_img_circle
-    imvis.imshow(tpl, "CIRCLE TMPL", wait_ms=10)
+    # imvis.imshow(tpl, "CIRCLE TMPL", wait_ms=10)
     # vis_ncc[tpl.shape[0]-1:, tpl.shape[1]-1:] = ncc
-    vis_ncc[:-tpl.shape[0]+1, :-tpl.shape[1]+1] = ncc
+    # vis_ncc[:-tpl.shape[0]+1, :-tpl.shape[1]+1] = ncc
     # overlay = imvis.overlay(calibration_template.tpl_img_full, 0.1, 
     #     imvis.pseudocolor(vis_ncc), warped_mask) #FIXME add mask
     overlay = imvis.overlay(calibration_template.tpl_img_full, 0.3,
             warped_img, warped_mask)
     y,x = np.unravel_index(ncc.argmax(), ncc.shape)
     cv2.rectangle(overlay, (x, y), (x+tpl.shape[1], y+tpl.shape[0]), (255, 0, 255))
+    imvis.imshow(imvis.pseudocolor(ncc, [-1, 1]), 'NCC Result', wait_ms=10)
     imvis.imshow(overlay, 'Projected image', wait_ms=10)
 
 #TODO calib_template: member template_marker, template_target
