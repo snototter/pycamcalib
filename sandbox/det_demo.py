@@ -130,9 +130,11 @@ if __name__ == '__main__':
     # Match template:
     # #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
     imgs = load_images()
+    det_params = patterns.eddie.ContourDetectionParams()
+    det_params.marker_min_width_px = 100
     for img in imgs:
         print('\n\nNEXT IMAGE--------------------------------------------------------------------------\n')
-        patterns.eddie.find_target(img, pattern_specs)
+        patterns.eddie.find_target(img, pattern_specs, det_params)
     # det_demo(imgs)
 
 

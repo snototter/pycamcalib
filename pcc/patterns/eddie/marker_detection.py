@@ -112,7 +112,15 @@ def _ensure_quadrilateral(shape):
         return None
     if shape['num_corners'] == 4:
         return shape
-    print('TODO line intersection, approximation')
+    #TODO is there a robust way to approximate a quad via line intersection?
+    # what if the longest edge is not on the opposite side of the clipping image border/occluder?
+    # Find the longest edge
+    pts = [Point(x=pt[0, 0], y=pt[0, 1]) for pt in shape['hull']]
+    edges = [(pts[idx], pts[(idx+1) % len(pts)]) for idx in range(len(pts))]
+    edge_lengths = np.array([e[0].distance(e[1]) for e in edges])
+    idx_longest = np.argmax(edge_lengths)
+    # print('EDGE LENGTHS', edge_lengths, idx_longest)
+
     return None
 
 
