@@ -14,12 +14,68 @@ class Point:
     y: float
 
     def int_repr(self):
-        """Returns a list representation [x, y] with all coordinates truncated to integers."""
-        return [int(x) for x in [self.x, self.y]]
+        """Returns a tuple representation [x, y] with all coordinates truncated
+        to integers (a tuple is required for OpenCV compatibility)."""
+        return (int(self.x), int(self.y))
 
     def distance(self, pt):
         """Returns the distance to the given point."""
         return np.sqrt((pt.x - self.x)**2 + (pt.y - self.y)**2)
+
+    def dot(self, pt):
+        """Returns the dot product between this and the given 2d vector."""
+        return self.x * pt.x + self.y * pt.y
+    
+
+@dataclass
+class Edge:
+    """Represents a 2d edge."""
+    pt1: Point
+    pt2: Point
+
+    @property
+    def length(self):
+        """Returns the length of this edge (distance between the two endpoints)."""
+        return self.pt1.distance(self.pt2)
+    
+    @property
+    def direction(self):
+        """Returns the unnormalized direction vector."""
+        return Point(x=self.pt2.x - self.pt1.x, y=self.pt2.y - self.pt1.y)
+
+    @property    
+    def unit_direction(self):
+        """Returns the unit direction vector."""
+        dirvec = self.direction
+        length = self.length
+        if length > 0:
+            return Point(x=dirvec.x / length, y=dirvec.y / length)
+        return dirvec
+
+    @property
+    def homogenous_form(self):
+        """Returns the homogenous representation of this line in projective P2 space."""
+        # For more details on lines in projective space:
+        # http://homepages.inf.ed.ac.uk/rbf/CVonline/LOCAL_COPIES/BEARDSLEY/node2.html
+        # http://robotics.stanford.edu/~birch/projective/node4.html
+        a = np.array([self.pt1.x, self.pt1.y, 1], dtype=np.float32)
+        b = np.array([self.pt2.x, self.pt2.y, 1], dtype=np.float32)
+        return np.cross(a, b)
+    
+    def angle(self, e2):
+        """Returns the angle (in radians) between this and the given edge."""
+        dp = self.unit_direction.dot(e2.unit_direction)
+        return np.arccos(max(-1, min(1, dp)))
+
+    def intersection(self, e2):
+        """Return the intersection point (or None) between this and the given edge."""
+        # In P2, line intersection is simply their cross product:
+        ip = np.cross(self.homogenous_form, e2.homogenous_form)
+        if np.isclose(ip[2], 0, atol=1e-7):
+            # Parallel edges
+            return None
+        # Normalize (P2 space ==> R2, i.e. Euclidean 2-space)
+        return Point(x=ip[0] / ip[2], y=ip[1] / ip[2])
 
 
 @dataclass
@@ -140,3 +196,13 @@ def points2numpy(pt_list, Nx2=True):
             npp[0, idx] = pt_list[idx].x
             npp[1, idx] = pt_list[idx].y
     return npp
+
+
+def bottommost_point(pt_list):
+    if pt_list is None or len(pt_list) == 0:
+        return None
+    bm_idx = 0
+    for idx in range(len(pt_list)):
+        if pt_list[idx].y < pt_list[bm_idx].y:
+            bm_idx = idx
+    return pt_list[bm_idx]

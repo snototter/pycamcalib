@@ -1,9 +1,10 @@
 import cv2
+import sys
 import logging
 import numpy as np
 from dataclasses import dataclass, field
 from vito import imutils, imvis, pyutils, cam_projections as pru
-from ..common import GridIndex, Rect, Point, sort_points_ccw, points2numpy, image_corners, numpy2cvpt
+from ..common import GridIndex, Rect, Point, Edge, sort_points_ccw, points2numpy, image_corners, numpy2cvpt, bottommost_point
 
 
 @dataclass
@@ -68,7 +69,7 @@ class ContourDetectionParams:
     marker_template_size_px: int = 64
     marker_margin_mm: int = 3
     simplification_factor: float = 0.05
-    max_candidates_per_image: int = 3 #FIXME
+    max_candidates_per_image: int = 10 #FIXME
     edge_blur_kernel_size: int = 3
     edge_canny_lower_thresh: int = 50
     edge_canny_upper_thresh: int = 200
@@ -76,7 +77,7 @@ class ContourDetectionParams:
     edge_dilation_kernel_size: int = 3
 
     # Acceptance threshold on the normalized correlation coefficient [-1, +1]
-    marker_ccoeff_thresh: float = 0.9 #TODO doc
+    marker_ccoeff_thresh: float = 0.7 #TODO doc
     marker_min_width_px: int = None #TODO doc
     grid_ccoeff_thresh: float = 0.5 #TODO doc
     debug: bool = True
@@ -115,7 +116,7 @@ def _md_preprocess_img(img, det_params):
     return PreprocessingResult(original=img, gray=gray, thresholded=bw, edges=edges)
 
 
-def _ensure_quadrilateral(shape):
+def _ensure_quadrilateral(shape, img=None):
     """Returns a 4-corner approximation of the given shape."""
     if shape['num_corners'] < 4 or shape['num_corners'] > 6:
         return None
@@ -126,12 +127,70 @@ def _ensure_quadrilateral(shape):
     #
     # TODO as of now, this is just a nice-to-have functionality (lowest priority)
     #
-    # # Find the longest edge
-    # pts = [Point(x=pt[0, 0], y=pt[0, 1]) for pt in shape['hull']]
-    # edges = [(pts[idx], pts[(idx+1) % len(pts)]) for idx in range(len(pts))]
-    # edge_lengths = np.array([e[0].distance(e[1]) for e in edges])
-    # idx_longest = np.argmax(edge_lengths)
-    # # print('EDGE LENGTHS', edge_lengths, idx_longest)
+    # Assumption: the longest edge is fully visible - TODO verify if both endpoints are within
+    # the image (not touching the border? but then there`could be an occluding object...) but such
+    # bad examples wouldn't pass the NCC check anyhow....
+    #
+    # Find the longest edge
+    pts = [Point(x=pt[0, 0], y=pt[0, 1]) for pt in shape['hull']]
+    edges = [Edge(pts[idx], pts[(idx+1) % len(pts)]) for idx in range(len(pts))]
+    edge_lengths = np.array([e.length for e in edges])
+    idx_longest = np.argmax(edge_lengths)
+
+    # Find most parallel edge
+    most_parallel_angle = None
+    idx_parallel = None
+    orth_edges = list()
+    for idx in range(len(edges)):
+        ##### print('INTERSECTION DEMO: angle: ', edges[idx_longest].angle(edges[idx]), 'intersect:', edges[idx_longest].intersection(edges[idx]))
+        if idx == idx_longest:
+            continue
+        angle = edges[idx_longest].angle(edges[idx])
+        orth_edges.append((edges[idx], np.abs(angle - np.pi/2)))
+        angle = np.abs(angle - np.pi)
+        if most_parallel_angle is None or angle < most_parallel_angle:
+            most_parallel_angle = angle
+            idx_parallel = idx
+        ##### print('Angle longest to {}: {} deg, idx: {}'.format(edges[idx], np.rad2deg(edges[idx_longest].angle(edges[idx])), idx_parallel))
+    # Sort edges by "how orthogonal they are" w.r.t. to the longest edge
+    orth_edges.sort(key=lambda oe: oe[1])
+    # Remove the sorting key
+    orth_edges = [oe[0] for oe in orth_edges]
+    # Intersect the lines (longest & parallel with the two "most orthogonal") to
+    # get the quad
+    intersections = list()
+    for pidx in [idx_longest, idx_parallel]:
+        for oidx in [0, 1]:
+            ip = edges[pidx].intersection(orth_edges[oidx])
+            if ip is not None:
+                intersections.append(ip)
+    # Sort the intersection points in CCW order to get a convex hull, starting
+    # from the bottommost point
+    intersections = sort_points_ccw(intersections,
+                                    pt_ref=bottommost_point(intersections))
+    # Debug visualizations
+    if img is not None:
+        vis = img.copy()
+        cv2.line(vis, edges[idx_longest].pt1.int_repr(), edges[idx_longest].pt2.int_repr(),
+                 (255, 0, 0), 3)
+        cv2.line(vis, edges[idx_parallel].pt1.int_repr(), edges[idx_parallel].pt2.int_repr(),
+                 (255, 255, 0), 3)
+        for idx in range(2):
+            cv2.line(vis, orth_edges[idx].pt1.int_repr(), orth_edges[idx].pt2.int_repr(),
+                     (0, 255, 255), 3)
+        for ip in intersections:
+            cv2.circle(vis, ip.int_repr(), 10, (255, 0, 255), 3)
+        imvis.imshow(vis, 'make quad: r=longest, y=parallel, c=orth, m=intersections', wait_ms=100)
+    # Convert intersection points to same format as OpenCV uses for contours
+    hull = np.zeros((len(intersections), 1, 2), dtype=np.int32)
+    for idx in range(len(intersections)):
+        hull[idx, 0, :] = intersections[idx].int_repr()
+    shape['hull'] = hull
+    shape['num_corners'] = len(intersections)
+    # Unnecessary check for now - but we might change the quad approximation
+    # later on, so for future safety, verify the number of hull points again:
+    if shape['num_corners'] == 4:
+        return shape
     return None
 
 
@@ -167,7 +226,7 @@ def _md_find_shape_candidates(det_params, preprocessed, vis_img=None):
     for shape in shapes:
         is_candidate = False
         if 3 < shape['num_corners'] < 6:
-            candidate = _ensure_quadrilateral(shape)
+            candidate = _ensure_quadrilateral(shape, preprocessed.original)
             if candidate is not None:
                 is_candidate = True
                 candidate_shapes.append(candidate)
@@ -193,13 +252,13 @@ def _md_find_shape_candidates(det_params, preprocessed, vis_img=None):
 
 
 def _find_transform(preprocessed, candidate, det_params, calibration_template):
-    """Tries to find the homography between the calibration template and the given
-    quadrilateral candidate."""
-    # Ensure that both img and marker points are in the same (CCW) order
+    """Estimates the homography between the calibration template and the given
+    quadrilateral center marker candidate."""
+    # Ensure that both the image and the marker points are in the same (CCW) order
     img_corners = sort_points_ccw([Point(x=pt[0, 0], y=pt[0, 1]) for pt in candidate['hull']])
     coords_dst = points2numpy(calibration_template.refpts_cropped_marker)
     coords_src = points2numpy(img_corners)
-    # Estimate homography
+    # Estimate the homography
     H = cv2.getPerspectiveTransform(coords_src, coords_dst)
     if H is None:
         return None
@@ -207,28 +266,33 @@ def _find_transform(preprocessed, candidate, det_params, calibration_template):
                     (det_params.marker_template_size_px,
                      det_params.marker_template_size_px),
                     borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 0, 0))
-    # Rotate the image 4 times and check if one orientation fits the template's center marker
-    # This just takes 0.6-0.9ms in total (!), so no use in premature optimization.
+    # Rotate the image 4 times by 90 degrees each and check if one orientation fits
+    # the template's center marker sufficiently well.
+    # This just takes 0.6-0.9ms in total (!), so there is no use for premature optimization.
     # Alternative ideas: sum reduction, profile comparison (e.g. via earth mover's distance or
     # even just L1), choose orientation with minimum "sum profile" difference.
     if det_params.debug:
         vis_img = calibration_template.tpl_cropped_marker.copy()
+    # Define the rotations we'll apply in the following loop
     transforms = [imutils.noop, imutils.rotate90,
                   imutils.rotate180, imutils.rotate270]
     similarities = np.zeros((len(transforms),))
-
     for idx, fx in zip(range(4), transforms):
         rotated = fx(warped)
-        res = cv2.matchTemplate(rotated, calibration_template.tpl_cropped_marker, cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(rotated, calibration_template.tpl_cropped_marker,
+                                cv2.TM_CCOEFF_NORMED)
         similarities[idx] = res[0, 0]
         if det_params.debug:
             highlight_str = ' ***' if similarities[idx] > det_params.marker_ccoeff_thresh else ''
             print(f'orientation: {idx*90:3d}, similarity: {res.item(0):6.3f}{highlight_str}')
             vis_img = imutils.concat(vis_img, rotated, horizontal=True)
+    # Find transformation which gave the highest similarity
     best_idx = np.argmax(similarities)
     if similarities[best_idx] > det_params.marker_ccoeff_thresh:
         if det_params.debug:
-            imvis.imshow(vis_img, 'Templated + Warped Candidate', wait_ms=100) #TODO remove
+            imvis.imshow(vis_img, 'Templated + Warped Candidate', wait_ms=100)
+        # Re-order the image's center marker corners according
+        # to the most fitting rotation:
         first_idx = 3 - best_idx
         rotated_corners = [img_corners[(first_idx + i) % 4] for i in range(4)]
         return Transform(shape=candidate, homography=H,
@@ -236,7 +300,6 @@ def _find_transform(preprocessed, candidate, det_params, calibration_template):
                          rotation_deg=90*best_idx,
                          marker_corners=rotated_corners)
     return None
-
 
 
 def _find_initial_grid_points(preproc, transform, pattern_specs, det_params, vis=None):
@@ -299,13 +362,38 @@ def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
             preproc, transform, pattern_specs, det_params, vis)
     #TODO refine!
 
+
+# TODO example of pool.map for later parallelization: 
+# https://stackoverflow.com/questions/5442910/how-to-use-multiprocessing-pool-map-with-multiple-arguments
+# https://stackoverflow.com/questions/659865/multiprocessing-sharing-a-large-read-only-object-between-processes
+
+def sizeof_fmt(num, suffix='B'):
+    # Taken from https://stackoverflow.com/a/1094933/400948
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
 # improvement: sum reduce, chose best orientation
 #TODO refactor (e.g. input images iterable, compute tpl once, ...)
 #TODO what to return? ==> matching points
 def find_target(img, pattern_specs, det_params=ContourDetectionParams()):
     # pyutils.tic('img-preprocessing')#TODO remove
-    preprocessed = _md_preprocess_img(img, det_params)    
+    preprocessed = _md_preprocess_img(img, det_params)
     if det_params.debug:
+        # https://stackoverflow.com/questions/449560/how-do-i-determine-the-size-of-an-object-in-python
+        print(f"""Object sizes:
+        pattern_spec: {sizeof_fmt(sys.getsizeof(pattern_specs))}
+        det_params:   {sizeof_fmt(sys.getsizeof(det_params))}
+        preprocessed: {sizeof_fmt(sys.getsizeof(preprocessed))}
+        """)
+        print('REQUIRES pympler!!')
+        from pympler import asizeof
+        print(f"""Sizes with pympler:
+        pattern_spec: {sizeof_fmt(asizeof.asizeof(pattern_specs))}
+        det_params:   {sizeof_fmt(asizeof.asizeof(det_params))}
+        preprocessed: {sizeof_fmt(asizeof.asizeof(preprocessed))}
+        """)
         from vito import imvis
         vis = imutils.ensure_c3(preprocessed.gray)
     else:
@@ -327,4 +415,14 @@ def find_target(img, pattern_specs, det_params=ContourDetectionParams()):
     if len(transforms) > 0:
         _find_grid(preprocessed, transforms[0], pattern_specs, det_params, vis=vis)
     if det_params.debug:
+        print(f"""Object sizes after computation:
+        pattern_spec: {sizeof_fmt(sys.getsizeof(pattern_specs))}
+        det_params:   {sizeof_fmt(sys.getsizeof(det_params))}
+        preprocessed: {sizeof_fmt(sys.getsizeof(preprocessed))}
+        """)
+        print(f"""Sizes with pympler:
+        pattern_spec: {sizeof_fmt(asizeof.asizeof(pattern_specs))}
+        det_params:   {sizeof_fmt(asizeof.asizeof(det_params))}
+        preprocessed: {sizeof_fmt(asizeof.asizeof(preprocessed))}
+        """)
         imvis.imshow(vis, title='contours', wait_ms=-1)

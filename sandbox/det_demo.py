@@ -13,12 +13,13 @@ from pcc import patterns
 
 
 def load_images():
-    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in range(6)] #[0, 1, 6]]
+    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in range(7)]  # all
+    # return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in [4]]  # clipped example
 
 def hough_lines(img):
     g = imutils.grayscale(img)
     vis = img.copy()
-    edges = cv2.Canny(g,100,200,apertureSize = 3)
+    edges = cv2.Canny(g,100,200,apertureSize=3)
     #lines = cv2.HoughLines(edges,1,np.pi/180,50)
     # for rho,theta in lines[0]:
     #     a = np.cos(theta)
