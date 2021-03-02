@@ -79,7 +79,8 @@ class ContourDetectionParams:
     # Acceptance threshold on the normalized correlation coefficient [-1, +1]
     marker_ccoeff_thresh: float = 0.7 #TODO doc
     marker_min_width_px: int = None #TODO doc
-    grid_ccoeff_thresh: float = 0.5 #TODO doc
+    grid_ccoeff_thresh_initial: float = 0.4 #TODO doc
+    grid_ccoeff_thresh_refine: float = 0.8
     debug: bool = True
 
     # def __post_init__(self):
@@ -316,7 +317,7 @@ def _find_initial_grid_points(preproc, transform, pattern_specs, det_params, vis
                                       H, (w, h), cv2.INTER_NEAREST)
 
     ncc = cv2.matchTemplate(warped_img, ctpl.tpl_cropped_circle, cv2.TM_CCOEFF_NORMED)  # mask must be template size??
-    ncc[ncc < det_params.grid_ccoeff_thresh] = 0
+    ncc[ncc < det_params.grid_ccoeff_thresh_initial] = 0
 
     if det_params.debug:
         overlay = imutils.ensure_c3(imvis.overlay(ctpl.tpl_full, 0.3, warped_img, warped_mask))
@@ -334,7 +335,7 @@ def _find_initial_grid_points(preproc, transform, pattern_specs, det_params, vis
     tpl = ctpl.tpl_cropped_circle
     while True:
         y, x = np.unravel_index(ncc.argmax(), ncc.shape)
-        if ncc[y, x] < det_params.grid_ccoeff_thresh:
+        if ncc[y, x] < det_params.grid_ccoeff_thresh_initial:
             break
         initial_estimates.append(CalibrationGridPoint(
             x=x, y=y, score=ncc[y, x]))
@@ -381,19 +382,20 @@ def find_target(img, pattern_specs, det_params=ContourDetectionParams()):
     # pyutils.tic('img-preprocessing')#TODO remove
     preprocessed = _md_preprocess_img(img, det_params)
     if det_params.debug:
-        # https://stackoverflow.com/questions/449560/how-do-i-determine-the-size-of-an-object-in-python
-        print(f"""Object sizes:
-        pattern_spec: {sizeof_fmt(sys.getsizeof(pattern_specs))}
-        det_params:   {sizeof_fmt(sys.getsizeof(det_params))}
-        preprocessed: {sizeof_fmt(sys.getsizeof(preprocessed))}
-        """)
-        print('REQUIRES pympler!!')
-        from pympler import asizeof
-        print(f"""Sizes with pympler:
-        pattern_spec: {sizeof_fmt(asizeof.asizeof(pattern_specs))}
-        det_params:   {sizeof_fmt(asizeof.asizeof(det_params))}
-        preprocessed: {sizeof_fmt(asizeof.asizeof(preprocessed))}
-        """)
+        ### The pattern specification (+ rendered templates) takes ~1MB
+        # # https://stackoverflow.com/questions/449560/how-do-i-determine-the-size-of-an-object-in-python
+        # print(f"""Object sizes:
+        # pattern_spec: {sizeof_fmt(sys.getsizeof(pattern_specs))}
+        # det_params:   {sizeof_fmt(sys.getsizeof(det_params))}
+        # preprocessed: {sizeof_fmt(sys.getsizeof(preprocessed))}
+        # """)
+        # print('REQUIRES pympler!!')
+        # from pympler import asizeof
+        # print(f"""Sizes with pympler:
+        # pattern_spec: {sizeof_fmt(asizeof.asizeof(pattern_specs))}
+        # det_params:   {sizeof_fmt(asizeof.asizeof(det_params))}
+        # preprocessed: {sizeof_fmt(asizeof.asizeof(preprocessed))}
+        # """)
         from vito import imvis
         vis = imutils.ensure_c3(preprocessed.gray)
     else:
@@ -415,14 +417,14 @@ def find_target(img, pattern_specs, det_params=ContourDetectionParams()):
     if len(transforms) > 0:
         _find_grid(preprocessed, transforms[0], pattern_specs, det_params, vis=vis)
     if det_params.debug:
-        print(f"""Object sizes after computation:
-        pattern_spec: {sizeof_fmt(sys.getsizeof(pattern_specs))}
-        det_params:   {sizeof_fmt(sys.getsizeof(det_params))}
-        preprocessed: {sizeof_fmt(sys.getsizeof(preprocessed))}
-        """)
-        print(f"""Sizes with pympler:
-        pattern_spec: {sizeof_fmt(asizeof.asizeof(pattern_specs))}
-        det_params:   {sizeof_fmt(asizeof.asizeof(det_params))}
-        preprocessed: {sizeof_fmt(asizeof.asizeof(preprocessed))}
-        """)
+        # print(f"""Object sizes after computation:
+        # pattern_spec: {sizeof_fmt(sys.getsizeof(pattern_specs))}
+        # det_params:   {sizeof_fmt(sys.getsizeof(det_params))}
+        # preprocessed: {sizeof_fmt(sys.getsizeof(preprocessed))}
+        # """)
+        # print(f"""Sizes with pympler:
+        # pattern_spec: {sizeof_fmt(asizeof.asizeof(pattern_specs))}
+        # det_params:   {sizeof_fmt(asizeof.asizeof(det_params))}
+        # preprocessed: {sizeof_fmt(asizeof.asizeof(preprocessed))}
+        # """)
         imvis.imshow(vis, title='contours', wait_ms=-1)
