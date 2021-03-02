@@ -24,6 +24,13 @@ class PreprocessingResult:
 
 
 @dataclass
+class CalibrationGridPoint:
+    x: float
+    y: float
+    score: float
+
+
+@dataclass
 class ContourDetectionParams:
     """
     The basic idea is to find rectangle-like shapes, warp the image to the
@@ -71,7 +78,7 @@ class ContourDetectionParams:
     # Acceptance threshold on the normalized correlation coefficient [-1, +1]
     marker_ccoeff_thresh: float = 0.9 #TODO doc
     marker_min_width_px: int = None #TODO doc
-    grid_ccoeff_thresh: float = 0.8 #TODO doc
+    grid_ccoeff_thresh: float = 0.5 #TODO doc
     debug: bool = True
 
     # def __post_init__(self):
@@ -231,13 +238,15 @@ def _find_transform(preprocessed, candidate, det_params, calibration_template):
     return None
 
 
-def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
+
+def _find_initial_grid_points(preproc, transform, pattern_specs, det_params, vis=None):
+    pyutils.tic('initial grid estimate') #TODO remove
     ctpl = pattern_specs.calibration_template  # Alias
     coords_dst = points2numpy(ctpl.refpts_full_marker)
     coords_src = points2numpy(transform.marker_corners)
     H = cv2.getPerspectiveTransform(coords_src, coords_dst)
     if H is None:
-        return vis
+        return None, vis
     h, w = ctpl.tpl_full.shape[:2]
     warped_img = cv2.warpPerspective(preproc.thresholded, H, (w, h), cv2.INTER_CUBIC)
     warped_mask = cv2.warpPerspective(np.ones(preproc.thresholded.shape[:2], dtype=np.uint8),
@@ -254,25 +263,41 @@ def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
             pt2 = numpy2cvpt(warped_img_corners[:, (i+1)%4])
             cv2.line(overlay, pt1, pt2, color=(0, 0, 255), thickness=3)
 
-        #FIXME FIXME FIXME
-        # Idea: detect blobs in thresholded NCC
-        # barycenter/centroid of each blob gives the top-left corner (then compute the relative offset to get the initial corner guess)
-        tpl = ctpl.tpl_cropped_circle
-        for niter in range(300):
-            y, x = np.unravel_index(ncc.argmax(), ncc.shape)
-            cv2.rectangle(overlay, (x, y), (x+tpl.shape[1], y+tpl.shape[0]), (255, 0, 255))
-            left = x - tpl.shape[1] // 2
-            right = left + tpl.shape[1]
-            top = y - tpl.shape[0] // 2
-            bottom = top + tpl.shape[0]
-            ncc[top:bottom, left:right] = 0
-            if niter % 10 == 0:
+    #FIXME FIXME FIXME
+    # Idea: detect blobs in thresholded NCC
+    # this could replace the greedy nms below
+    # barycenter/centroid of each blob gives the top-left corner (then compute the relative offset to get the initial corner guess)
+    initial_estimates = list()
+    tpl = ctpl.tpl_cropped_circle
+    while True:
+        y, x = np.unravel_index(ncc.argmax(), ncc.shape)
+        if ncc[y, x] < det_params.grid_ccoeff_thresh:
+            break
+        initial_estimates.append(CalibrationGridPoint(
+            x=x, y=y, score=ncc[y, x]))
+        left = x - tpl.shape[1] // 2
+        right = left + tpl.shape[1]
+        top = y - tpl.shape[0] // 2
+        bottom = top + tpl.shape[0]
+        ncc[top:bottom, left:right] = 0
+        if det_params.debug:
+            cv2.rectangle(overlay, (x, y), 
+                    (x+ctpl.tpl_cropped_circle.shape[1], y+ctpl.tpl_cropped_circle.shape[0]),
+                    (255, 0, 255))
+            if len(initial_estimates) % 20 == 0:
                 imvis.imshow(imvis.pseudocolor(ncc, [-1, 1]), 'NCC Result', wait_ms=10)
                 imvis.imshow(overlay, 'Projected image', wait_ms=10)
 
     if vis is not None:
         cv2.drawContours(vis, [transform.shape['hull']], 0, (200, 0, 200), 3)
-    return vis
+    pyutils.toc('initial grid estimate') #TODO remove
+    return initial_estimates, vis
+
+
+def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
+    initial_estimates, vis = _find_initial_grid_points(
+            preproc, transform, pattern_specs, det_params, vis)
+    #TODO refine!
 
 # improvement: sum reduce, chose best orientation
 #TODO refactor (e.g. input images iterable, compute tpl once, ...)
@@ -283,6 +308,8 @@ def find_target(img, pattern_specs, det_params=ContourDetectionParams()):
     if det_params.debug:
         from vito import imvis
         vis = imutils.ensure_c3(preprocessed.gray)
+    else:
+        vis = None
     # pyutils.toc('img-preprocessing')#TODO remove - 20-30ms
     # pyutils.tic('center-candidates-contours')#TODO remove
     candidate_shapes, vis = _md_find_shape_candidates(det_params, preprocessed, vis)
