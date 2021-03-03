@@ -318,8 +318,8 @@ def _find_initial_grid_points(preproc, transform, pattern_specs, det_params, vis
 ################# Alternative: extract contours!
     #pp_warp = _md_preprocess_img(warped_img, det_params)
 ####FIXME
-    _, bw = cv2.threshold(warped_img, 0.0, 255.0, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
-    edges = cv2.Canny(bw, det_params.edge_canny_lower_thresh,
+    # _, bw = cv2.threshold(warped_img, 0.0, 255.0, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    edges = cv2.Canny(warped_img, det_params.edge_canny_lower_thresh,
                       det_params.edge_canny_upper_thresh,
                       apertureSize=det_params.edge_sobel_aperture)
     cnts = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -340,12 +340,12 @@ def _find_initial_grid_points(preproc, transform, pattern_specs, det_params, vis
         # Centroid
         M = cv2.moments(shape)
         try:
-            cx = M['m10']/M['m00']
-            cy = M['m01']/M['m00']
+            cx = np.round(M['m10']/M['m00'])
+            cy = np.round(M['m01']/M['m00'])
         except ZeroDivisionError:
             continue
         
-        cv2.drawContours(vis_alt, [shape], 0, color, 1)
+        cv2.drawContours(vis_alt, [shape], 0, color, -1)
         cv2.circle(vis_alt, (int(cx), int(cy)), 1, (255, 255, 0), -1)
         idx += 1
         if idx % 10 == 0:
