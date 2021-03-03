@@ -20,6 +20,7 @@ class CalibrationTemplate:
     refpts_cropped_marker: list
     tpl_cropped_circle: np.ndarray = field(init=True, repr=False)
     refpts_cropped_circle: list
+    dia_circle_px: float
 
 
 @dataclass(frozen=True)
@@ -395,7 +396,8 @@ class PatternSpecificationEddie:
         tpl_circle = imutils.crop(tpl_full, circle_roi.int_repr())
         ref_pts_tpl_circle = [Point(x=pt.x * tpl_circle.shape[1],
                                     y=pt.y * tpl_circle.shape[0]) for pt in ref_pts_circle_relative]
-
+        # Compute expected size of a circle in the image template
+        dia_circle_px = self.dia_circles_mm / self.target_width_mm * tpl_full.shape[1]
         ###DEBUG VISUALS
         # vis_tpl_circle = tpl_circle.copy()
         # foo = imutils.ensure_c3(tpl_full.copy()) # FIXME REMOVE
@@ -414,6 +416,7 @@ class PatternSpecificationEddie:
                                         refpts_cropped_marker=ref_pts_tpl_marker,
                                         tpl_cropped_circle=tpl_circle,
                                         refpts_cropped_circle=ref_pts_tpl_circle,
+                                        dia_circle_px=dia_circle_px
                                     ))
 
 

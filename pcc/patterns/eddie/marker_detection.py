@@ -315,6 +315,62 @@ def _find_initial_grid_points(preproc, transform, pattern_specs, det_params, vis
     warped_img = cv2.warpPerspective(preproc.thresholded, H, (w, h), cv2.INTER_CUBIC)
     warped_mask = cv2.warpPerspective(np.ones(preproc.thresholded.shape[:2], dtype=np.uint8),
                                       H, (w, h), cv2.INTER_NEAREST)
+################# Alternative: extract contours!
+    #pp_warp = _md_preprocess_img(warped_img, det_params)
+####FIXME
+    _, bw = cv2.threshold(warped_img, 0.0, 255.0, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+    edges = cv2.Canny(bw, det_params.edge_canny_lower_thresh,
+                      det_params.edge_canny_upper_thresh,
+                      apertureSize=det_params.edge_sobel_aperture)
+    cnts = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    
+    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+    vis_alt = imutils.ensure_c3(warped_img.copy())
+    idx = 0
+    expected_circle_area = (pattern_specs.calibration_template.dia_circle_px/2)**2 * np.pi
+    exp_circ_area_lower = 0.5 * expected_circle_area
+    exp_circ_area_upper = 2 * expected_circle_area
+    for shape in cnts:
+        area = cv2.contourArea(shape)
+        if area < exp_circ_area_lower or area > exp_circ_area_upper:
+            color=(255,0,0)
+        else:
+            color=(0, 0, 255)
+            # continue
+        # Centroid
+        M = cv2.moments(shape)
+        try:
+            cx = M['m10']/M['m00']
+            cy = M['m01']/M['m00']
+        except ZeroDivisionError:
+            continue
+        
+        cv2.drawContours(vis_alt, [shape], 0, color, 1)
+        cv2.circle(vis_alt, (int(cx), int(cy)), 1, (255, 255, 0), -1)
+        idx += 1
+        if idx % 10 == 0:
+            imvis.imshow(vis_alt, 'FOOOOOO', wait_ms=10)
+    # Collect the convex hulls of all detected contours    
+    shapes = list()
+    # for cnt in cnts:
+        # # Compute a simplified convex hull
+        # epsilon = det_params.simplification_factor*cv2.arcLength(cnt, True)
+        # approx = cv2.approxPolyDP(cnt, epsilon, True)
+        # # Important: 
+        # # Simplification with too large epsilons could lead to intersecting
+        # # polygons. These would cause incorrect area computation, and more
+        # # "fun" behavior. Thus, we work with the shape's convex hull from
+        # # now on.
+        # hull = cv2.convexHull(approx)
+        # area = cv2.contourArea(hull)
+        # if det_params.min_marker_area_px is None or\
+        #         area >= det_params.min_marker_area_px:
+        #     shapes.append({'hull': hull, 'approx': approx, 'cnt': cnt,
+        #                    'hull_area': area,
+        #                    'num_corners': len(hull)})
+
+    imvis.imshow(vis_alt, 'FOOOOOO', wait_ms=-1)
+################### End alternative
 
     ncc = cv2.matchTemplate(warped_img, ctpl.tpl_cropped_circle, cv2.TM_CCOEFF_NORMED)  # mask must be template size??
     ncc[ncc < det_params.grid_ccoeff_thresh_initial] = 0
