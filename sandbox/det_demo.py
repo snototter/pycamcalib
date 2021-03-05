@@ -13,7 +13,7 @@ from pcc import patterns
 
 
 def load_images():
-    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in range(7)]  # all
+    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in range(6)]
     # return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in [4]]  # clipped example
 
 def hough_lines(img):
@@ -131,6 +131,7 @@ if __name__ == '__main__':
     # Match template:
     # #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
     imgs = load_images()
+    imgs[0] = pattern_specs.calibration_template.tpl_full
     det_params = patterns.eddie.ContourDetectionParams()
     det_params.marker_min_width_px = 100
     for img in imgs:
