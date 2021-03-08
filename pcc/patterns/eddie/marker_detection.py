@@ -69,8 +69,8 @@ class ContourDetectionParams:
     """
     marker_template_size_px: int = 64
     marker_margin_mm: int = 3
-    simplification_factor: float = 0.05
-    max_candidates_per_image: int = -1 #FIXME
+    simplification_factor: float = 0.01
+    max_candidates_per_image: int = 10 #FIXME
     edge_blur_kernel_size: int = 3
     edge_canny_lower_thresh: int = 50
     edge_canny_upper_thresh: int = 200
@@ -78,7 +78,7 @@ class ContourDetectionParams:
     edge_dilation_kernel_size: int = 3
 
     # Acceptance threshold on the normalized correlation coefficient [-1, +1]
-    marker_ccoeff_thresh: float = 0.6 #TODO doc
+    marker_ccoeff_thresh: float = 0.7 #TODO doc
     marker_min_width_px: int = None #TODO doc
     grid_ccoeff_thresh_initial: float = 0.6 #TODO doc
     grid_ccoeff_thresh_refine: float = 0.8
@@ -121,7 +121,7 @@ def _md_preprocess_img(img, det_params):
 
 def _ensure_quadrilateral(shape, img=None):
     """Returns a 4-corner approximation of the given shape."""
-    if shape['num_corners'] < 4 or shape['num_corners'] > 6:
+    if shape['num_corners'] < 4 or shape['num_corners'] > 8:
         return None
     if shape['num_corners'] == 4:
         return shape
@@ -182,7 +182,7 @@ def _ensure_quadrilateral(shape, img=None):
                      (0, 255, 255), 3)
         for ip in intersections:
             cv2.circle(vis, ip.int_repr(), 10, (255, 0, 255), 3)
-        imvis.imshow(vis, 'make quad: r=longest, y=parallel, c=orth, m=intersections', wait_ms=-1)
+        imvis.imshow(vis, 'Ensure quad: r=longest, y=parallel, c=orth, m=intersections', wait_ms=100)
     # Convert intersection points to same format as OpenCV uses for contours
     hull = np.zeros((len(intersections), 1, 2), dtype=np.int32)
     for idx in range(len(intersections)):
@@ -198,12 +198,16 @@ def _ensure_quadrilateral(shape, img=None):
 
 def _md_find_center_marker_candidates(det_params, preprocessed, vis_img=None):
     """Locate candidate regions which could contain the marker."""
+    debug_shape_extraction = det_params.debug and True
     # We don't want hierarchies of contours here, just the largest (i.e. the
     # root) contour of each hierarchy is fine:
-    cnts = cv2.findContours(preprocessed.edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    cnts = cv2.findContours(preprocessed.wb, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cnts = cnts[0] if len(cnts) == 2 else cnts[1]
     # Collect the convex hulls of all detected contours    
     shapes = list()
+    if debug_shape_extraction:
+        tmp_vis = imutils.ensure_c3(preprocessed.wb)
+        tmp_drawn = 0
     for cnt in cnts:
         # Compute a simplified convex hull
         epsilon = det_params.simplification_factor*cv2.arcLength(cnt, True)
@@ -215,12 +219,20 @@ def _md_find_center_marker_candidates(det_params, preprocessed, vis_img=None):
         # now on.
         hull = cv2.convexHull(approx)
         area = cv2.contourArea(hull)
-        # print('Marker candidates', len(hull))
+        if debug_shape_extraction:
+            cv2.drawContours(tmp_vis, [cnt], 0, (255, 0, 0), 7)
+            cv2.drawContours(tmp_vis, [hull], 0, (255, 0, 255), 7)
+            tmp_drawn += 1
+            if tmp_drawn % 10 == 0:
+                imvis.imshow(tmp_vis, 'Shape candidates', wait_ms=10)
         if det_params.min_marker_area_px is None or\
                 area >= det_params.min_marker_area_px:
             shapes.append({'hull': hull, 'approx': approx, 'cnt': cnt,
                            'hull_area': area,
                            'num_corners': len(hull)})
+    if debug_shape_extraction:
+        print('Press key to continue')
+        imvis.imshow(tmp_vis, 'Shape candidates', wait_ms=-1)
     # Sort candidate shapes by area (descending)
     shapes.sort(key=lambda s: s['hull_area'], reverse=True)
     # Collect valid convex hulls, i.e. having 4-6 corners which could
@@ -228,7 +240,7 @@ def _md_find_center_marker_candidates(det_params, preprocessed, vis_img=None):
     candidate_shapes = list()
     for shape in shapes:
         is_candidate = False
-        if 3 < shape['num_corners'] < 7:
+        if 3 < shape['num_corners'] <= 8:
             candidate = _ensure_quadrilateral(shape, preprocessed.original)
             if candidate is not None:
                 is_candidate = True
@@ -350,7 +362,7 @@ def _find_initial_grid_points_contours(preproc, transform, pattern_specs, det_pa
             if idx % 10 == 0:
                 imvis.imshow(vis_alt, 'Points by contour', wait_ms=10)
     if det_params.debug:
-        imvis.imshow(vis_alt, 'Points by contour', wait_ms=-1)
+        imvis.imshow(vis_alt, 'Points by contour', wait_ms=10)
 
     initial_estimates = list()
     #TODO match the points
@@ -410,11 +422,14 @@ def _find_initial_grid_points_correlation(preproc, transform, pattern_specs, det
                     (x+ctpl.tpl_cropped_circle.shape[1], y+ctpl.tpl_cropped_circle.shape[0]),
                     (255, 0, 255))
             if len(initial_estimates) % 20 == 0:
-                imvis.imshow(imvis.pseudocolor(ncc, [-1, 1]), 'NCC Result', wait_ms=10)
+                # imvis.imshow(imvis.pseudocolor(ncc, [-1, 1]), 'NCC Result', wait_ms=10)
                 imvis.imshow(overlay, 'Points by correlation', wait_ms=10)
 
     if vis is not None:
         cv2.drawContours(vis, [transform.shape['hull']], 0, (200, 0, 200), 3)
+    if det_params.debug:
+        print('Press key to continue')
+        imvis.imshow(overlay, 'Points by correlation', wait_ms=-1)
     pyutils.toc('initial grid estimate - correlation') #TODO remove
     return initial_estimates, vis
 

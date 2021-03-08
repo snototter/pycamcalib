@@ -13,8 +13,8 @@ from pcc import patterns
 
 
 def load_images():
-    # return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in range(6)]
-    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in [4, 6]]  # clipped example
+    return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in range(7)]
+    # return [imutils.imread('calib/test{:d}.jpg'.format(i)) for i in [6]]  # clipped example
 
 def hough_lines(img):
     g = imutils.grayscale(img)
