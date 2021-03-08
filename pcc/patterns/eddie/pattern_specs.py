@@ -136,6 +136,9 @@ class PatternSpecificationEddie:
             logging.warning('Square center marker won''t be centered vertically.')
         top = ny // 2
         object.__setattr__(self, 'square_topleft_corner', GridIndex(row=top, col=left))
+        cx = left + self.circles_per_square_edge_length // 2
+        cy = top + self.circles_per_square_edge_length // 2
+        print('TODO eddie center: ', cx, cy, ' grid dimension: ', gw, gh)
 
     def _compute_skipped_circles(self):
         sidx = list()

@@ -70,7 +70,7 @@ class ContourDetectionParams:
     marker_template_size_px: int = 64
     marker_margin_mm: int = 3
     simplification_factor: float = 0.05
-    max_candidates_per_image: int = 10 #FIXME
+    max_candidates_per_image: int = -1 #FIXME
     edge_blur_kernel_size: int = 3
     edge_canny_lower_thresh: int = 50
     edge_canny_upper_thresh: int = 200
@@ -78,7 +78,7 @@ class ContourDetectionParams:
     edge_dilation_kernel_size: int = 3
 
     # Acceptance threshold on the normalized correlation coefficient [-1, +1]
-    marker_ccoeff_thresh: float = 0.7 #TODO doc
+    marker_ccoeff_thresh: float = 0.6 #TODO doc
     marker_min_width_px: int = None #TODO doc
     grid_ccoeff_thresh_initial: float = 0.6 #TODO doc
     grid_ccoeff_thresh_refine: float = 0.8
@@ -139,7 +139,6 @@ def _ensure_quadrilateral(shape, img=None):
     edges = [Edge(pts[idx], pts[(idx+1) % len(pts)]) for idx in range(len(pts))]
     edge_lengths = np.array([e.length for e in edges])
     idx_longest = np.argmax(edge_lengths)
-
     # Find most parallel edge
     most_parallel_angle = None
     idx_parallel = None
@@ -183,7 +182,7 @@ def _ensure_quadrilateral(shape, img=None):
                      (0, 255, 255), 3)
         for ip in intersections:
             cv2.circle(vis, ip.int_repr(), 10, (255, 0, 255), 3)
-        imvis.imshow(vis, 'make quad: r=longest, y=parallel, c=orth, m=intersections', wait_ms=100)
+        imvis.imshow(vis, 'make quad: r=longest, y=parallel, c=orth, m=intersections', wait_ms=-1)
     # Convert intersection points to same format as OpenCV uses for contours
     hull = np.zeros((len(intersections), 1, 2), dtype=np.int32)
     for idx in range(len(intersections)):
@@ -201,7 +200,7 @@ def _md_find_center_marker_candidates(det_params, preprocessed, vis_img=None):
     """Locate candidate regions which could contain the marker."""
     # We don't want hierarchies of contours here, just the largest (i.e. the
     # root) contour of each hierarchy is fine:
-    cnts = cv2.findContours(preprocessed.wb, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    cnts = cv2.findContours(preprocessed.edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     cnts = cnts[0] if len(cnts) == 2 else cnts[1]
     # Collect the convex hulls of all detected contours    
     shapes = list()
@@ -216,6 +215,7 @@ def _md_find_center_marker_candidates(det_params, preprocessed, vis_img=None):
         # now on.
         hull = cv2.convexHull(approx)
         area = cv2.contourArea(hull)
+        # print('Marker candidates', len(hull))
         if det_params.min_marker_area_px is None or\
                 area >= det_params.min_marker_area_px:
             shapes.append({'hull': hull, 'approx': approx, 'cnt': cnt,
@@ -228,7 +228,7 @@ def _md_find_center_marker_candidates(det_params, preprocessed, vis_img=None):
     candidate_shapes = list()
     for shape in shapes:
         is_candidate = False
-        if 3 < shape['num_corners'] < 6:
+        if 3 < shape['num_corners'] < 7:
             candidate = _ensure_quadrilateral(shape, preprocessed.original)
             if candidate is not None:
                 is_candidate = True
@@ -294,8 +294,8 @@ def _find_center_marker_transform(preprocessed, candidate, det_params, calibrati
     # Find transformation which gave the highest similarity
     best_idx = np.argmax(similarities)
     if similarities[best_idx] > det_params.marker_ccoeff_thresh:
-        if det_params.debug:
-            imvis.imshow(vis_img, 'Templated + Warped Candidate', wait_ms=100)
+        # # if det_params.debug:
+        # #     imvis.imshow(vis_img, 'Templated + Warped Candidate', wait_ms=100)
         # Re-order the image's center marker corners according
         # to the most fitting rotation:
         first_idx = 3 - best_idx
@@ -479,15 +479,15 @@ def find_target(img, pattern_specs, det_params=ContourDetectionParams()):
     # pyutils.toc('center-verification-projective')#TODO remove
     if len(transforms) > 0:
         _find_grid(preprocessed, transforms[0], pattern_specs, det_params, vis=vis)
-    if det_params.debug:
-        # print(f"""Object sizes after computation:
-        # pattern_spec: {sizeof_fmt(sys.getsizeof(pattern_specs))}
-        # det_params:   {sizeof_fmt(sys.getsizeof(det_params))}
-        # preprocessed: {sizeof_fmt(sys.getsizeof(preprocessed))}
-        # """)
-        # print(f"""Sizes with pympler:
-        # pattern_spec: {sizeof_fmt(asizeof.asizeof(pattern_specs))}
-        # det_params:   {sizeof_fmt(asizeof.asizeof(det_params))}
-        # preprocessed: {sizeof_fmt(asizeof.asizeof(preprocessed))}
-        # """)
-        imvis.imshow(vis, title='contours', wait_ms=-1)
+    # if det_params.debug:
+    #     # print(f"""Object sizes after computation:
+    #     # pattern_spec: {sizeof_fmt(sys.getsizeof(pattern_specs))}
+    #     # det_params:   {sizeof_fmt(sys.getsizeof(det_params))}
+    #     # preprocessed: {sizeof_fmt(sys.getsizeof(preprocessed))}
+    #     # """)
+    #     # print(f"""Sizes with pympler:
+    #     # pattern_spec: {sizeof_fmt(asizeof.asizeof(pattern_specs))}
+    #     # det_params:   {sizeof_fmt(asizeof.asizeof(det_params))}
+    #     # preprocessed: {sizeof_fmt(asizeof.asizeof(preprocessed))}
+    #     # """)
+    #     imvis.imshow(vis, title='contours', wait_ms=-1)
