@@ -113,6 +113,7 @@ class PatternSpecificationEddie:
         self._compute_skipped_circles()
         self._verify()
         self._compute_calibration_template()
+        self._compute_reference_grid()
 
     def _verify(self):
         # Circles mustn't touch
@@ -123,6 +124,8 @@ class PatternSpecificationEddie:
         if (self.circles_per_square_edge_length - 2*self.circles_per_square_edge_thickness < 2)\
                 or (self.circles_per_square_edge_length//2 - self.circles_per_square_edge_thickness <= 0):
             raise SpecificationError('The center marker must contain at least 1 row with 2 circles for orientation!')
+        if self.circles_per_square_edge_length % 2 == 1:
+            raise SpecificationError('The number of circles along the center marker''s edge must be even!')
 
     def _compute_square_topleft(self):
         gw = self.circles_per_row
@@ -136,9 +139,9 @@ class PatternSpecificationEddie:
             logging.warning('Square center marker won''t be centered vertically.')
         top = ny // 2
         object.__setattr__(self, 'square_topleft_corner', GridIndex(row=top, col=left))
-        cx = left + self.circles_per_square_edge_length // 2
-        cy = top + self.circles_per_square_edge_length // 2
-        print('TODO eddie center: ', cx, cy, ' grid dimension: ', gw, gh)
+        # cx = left + self.circles_per_square_edge_length // 2
+        # cy = top + self.circles_per_square_edge_length // 2
+        # print('TODO eddie center: ', cx, cy, ' grid dimension: ', gw, gh)
 
     def _compute_skipped_circles(self):
         sidx = list()
@@ -186,7 +189,7 @@ class PatternSpecificationEddie:
         rects.append(Rect(left=left, top=top+length_half, width=self.marker_size_mm, height=length_half))
         return rects
 
-    def skip_circle_idx(self, row, col):
+    def _skip_circle_idx(self, row, col):
         """
         Returns True if there should be no circle at the current
         grid position (row/col index).
@@ -237,7 +240,7 @@ class PatternSpecificationEddie:
         for ridx in range(self.circles_per_col):
             cx_mm = offset_x
             for cidx in range(self.circles_per_row):
-                if not self.skip_circle_idx(ridx, cidx):
+                if not self._skip_circle_idx(ridx, cidx):
                     grid.add(dwg.circle(center=(_mm(cx_mm), _mm(cy_mm)),
                         r=_mm(self.r_circles_mm), fill=self.fg_color))
                 cx_mm += self.dist_circles_mm
@@ -340,6 +343,39 @@ class PatternSpecificationEddie:
                        y=margin_mm/(self.marker_size_mm + 2*margin_mm))
         return rect, offset
     
+    def _compute_reference_grid(self):
+        #TODO FIXME
+        print('NUM CIRCLES:', self.circles_per_row, self.circles_per_col)
+        print('TOPLEFT SQUARE:', self.square_topleft_corner)
+        num_refpts_per_row = self.circles_per_row - 1
+        num_refpts_per_col = self.circles_per_col - 1
+        
+        
+        # top = tl.row * self.dist_circles_mm + offset_y - self.r_circles_mm
+        # left = tl.col * self.dist_circles_mm + offset_x - self.r_circles_mm
+        
+        def mm2px(pt):
+            return Point(x=pt.x / self.target_width_mm * self.calibration_template.tpl_full.shape[1],
+                         y=pt.y / self.target_height_mm * self.calibration_template.tpl_full.shape[0])
+        mx, my = self.computed_margins
+        mm_offset_x = mx + self.r_circles_mm
+        mm_offset_y = my + self.r_circles_mm
+        def circidx2mm(idx):
+            return Point(x=mm_offset_x + idx.col * self.dist_circles_mm,
+                         y=mm_offset_y + idx.row * self.dist_circles_mm)
+        from vito import imvis, imutils
+        import cv2
+        vis = imutils.ensure_c3(self.calibration_template.tpl_full.copy())
+        pt = mm2px(circidx2mm(self.square_topleft_corner))
+        cv2.circle(vis, pt.int_repr(), 3, (255, 0, 0), -1)
+        pt = mm2px(circidx2mm(GridIndex(0, 0)))
+        cv2.circle(vis, pt.int_repr(), 3, (0, 255, 0), -1)
+        pt = mm2px(circidx2mm(GridIndex(3, 2)))
+        cv2.circle(vis, pt.int_repr(), 3, (0, 0, 255), -1)
+        imvis.imshow(vis, "test", wait_ms=-1)
+        
+
+    
     def _compute_calibration_template(self):
         """Precomputes the calibration template image and reference points."""
         # Render full template
@@ -423,10 +459,10 @@ class PatternSpecificationEddie:
                                     ))
 
 
-"""Test pattern for development."""
-eddie_test_specs_a4 = PatternSpecificationEddie('Eddie Test Pattern A4',
-    target_width_mm=210, target_height_mm=297,
-    dia_circles_mm=5, dist_circles_mm=11)
+# """Test pattern for development."""
+# eddie_test_specs_a4 = PatternSpecificationEddie('Eddie Test Pattern A4',
+#     target_width_mm=210, target_height_mm=297,
+#     dia_circles_mm=5, dist_circles_mm=11)
 
 
 def save_eddie_assets():

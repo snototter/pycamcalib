@@ -119,6 +119,10 @@ def det_demo(imgs):
 
 
 if __name__ == '__main__':
+    pattern_specs = patterns.eddie.PatternSpecificationEddie('test',
+        target_width_mm=100, target_height_mm=60,
+        dia_circles_mm=5, dist_circles_mm=10)#, bg_color='orange')
+    raise NotImplementedError()
     ptl = [patterns.Point(0, 1), patterns.Point(0, 2), patterns.Point(0, 3), patterns.Point(0, 4), patterns.Point(0, 5), patterns.Point(-3, 0), patterns.Point(-2, 0)]
     print(patterns.sort_points_ccw(ptl, patterns.Point(0, 0)))
     print(patterns.sort_points_ccw(ptl, patterns.Point(0, 0), reverse=True))
@@ -128,6 +132,7 @@ if __name__ == '__main__':
     pattern_specs = patterns.eddie.PatternSpecificationEddie('alu',
         target_width_mm=315, target_height_mm=410,
         dia_circles_mm=5, dist_circles_mm=11)#, bg_color='orange')
+    
     # Match template:
     # #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
     imgs = load_images()
