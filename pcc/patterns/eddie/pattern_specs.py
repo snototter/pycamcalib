@@ -7,6 +7,7 @@ from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 from dataclasses import dataclass, field
 from vito import imutils, imvis
+from collections import deque
 from ..common import GridIndex, Rect, Point, sort_points_ccw, center, SpecificationError
 
 #TODO add member for default file location (within the package once we deploy it)
@@ -21,6 +22,15 @@ class CalibrationTemplate:
     tpl_cropped_circle: np.ndarray = field(init=True, repr=False)
     refpts_cropped_circle: list
     dia_circle_px: float
+
+
+@dataclass
+class ReferencePoint:
+    col: int
+    row: int
+    pos_mm_tl: Point  # Pos in mm relative to the target's top left corner
+    pos_mm_centered: Point # Pos in mm relative to the reference grid
+    surrounding_circles: list
 
 
 @dataclass(frozen=True)
@@ -101,6 +111,7 @@ class PatternSpecificationEddie:
     marker_size_mm: int = field(init=False, repr=False)
     marker_thickness_mm: int = field(init=False, repr=False)
     calibration_template: CalibrationTemplate = field(init=False, repr=False)
+    reference_points: list = field(init=False, repr=False)
 
     def __post_init__(self):
         # If the dataclass is frozen, we cannot set the computed values directly (https://stackoverflow.com/a/54119384/400948)
@@ -344,36 +355,111 @@ class PatternSpecificationEddie:
         return rect, offset
     
     def _compute_reference_grid(self):
-        #TODO FIXME
-        print('NUM CIRCLES:', self.circles_per_row, self.circles_per_col)
-        print('TOPLEFT SQUARE:', self.square_topleft_corner)
+        #TODO doc
+        debug = True
         num_refpts_per_row = self.circles_per_row - 1
         num_refpts_per_col = self.circles_per_col - 1
         
         
-        # top = tl.row * self.dist_circles_mm + offset_y - self.r_circles_mm
-        # left = tl.col * self.dist_circles_mm + offset_x - self.r_circles_mm
-        
-        def mm2px(pt):
-            return Point(x=pt.x / self.target_width_mm * self.calibration_template.tpl_full.shape[1],
-                         y=pt.y / self.target_height_mm * self.calibration_template.tpl_full.shape[0])
+        if debug:
+            from vito import imvis, imutils
+            import cv2
+            vis = imutils.ensure_c3(self.calibration_template.tpl_full.copy())
+
+        visited = np.zeros((num_refpts_per_col, num_refpts_per_row), dtype=np.bool)
+        nodes_to_visit = deque()
+        nodes_to_visit.append(self._make_reference_point(0, 0))
+        nnr = 0
+        reference_points = list()
+        while nodes_to_visit:
+            n = nodes_to_visit.popleft()
+            vidx = self._refpt2posgrid(n.col, n.row)
+            if vidx is None or visited[vidx.row, vidx.col]:
+                continue
+            nnr += 1
+            visited[vidx.row, vidx.col] = True
+            ## 8-neighborhood
+            nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row-1))
+            nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row-1))
+            nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row))
+            nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row+1))
+            nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row+1))
+            nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row+1))
+            nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row))
+            nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row-1))
+            ## 4-neighborhood
+            # nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row-1))
+            # nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row))
+            # nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row+1))
+            # nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row))
+
+            if n.surrounding_circles is not None:
+                reference_points.append(n)
+                if debug:
+                    pt = self._mm2px(n.pos_mm_tl)
+                    cv2.putText(vis, f'{nnr:d}', pt.int_repr(), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
+                    cv2.circle(vis, pt.int_repr(), 3, (255, 0, 0), -1)
+                    imvis.imshow(vis, "Reference Grid", wait_ms=1)
+        object.__setattr__(self, 'reference_points', reference_points)
+        if debug:
+            print('Check "reference grid". Press key to continue.')
+            imvis.imshow(vis, "Reference Grid", wait_ms=-1)
+    
+    def _make_reference_point(self, col, row):
+        mm_tl = self._refpt2mm(col, row)
+        mm_center = Point(x=col * self.dist_circles_mm, y=row * self.dist_circles_mm)
+        circ = self._refpt2surrounding_circles(col, row)
+        return ReferencePoint(col=col, row=row, pos_mm_tl=mm_tl, pos_mm_centered=mm_center, surrounding_circles=circ)
+
+    def _mm2px(self, pt):
+        return Point(x=pt.x / self.target_width_mm * self.calibration_template.tpl_full.shape[1],
+                     y=pt.y / self.target_height_mm * self.calibration_template.tpl_full.shape[0])
+
+    def _refpt2circlef(self, refgrid_col, refgrid_row):
+        # Float circle "index" of square marker's center
+        sqcenter_circ_x = self.square_topleft_corner.col + (self.circles_per_square_edge_length - 1)/2
+        sqcenter_circ_y = self.square_topleft_corner.row + (self.circles_per_square_edge_length - 1)/2
+        return (refgrid_col + sqcenter_circ_x, refgrid_row + sqcenter_circ_y)
+    
+    def _refpt2posgrid(self, refgrid_col, refgrid_row):
+        # positive grid index (to be used for marking off visited refpoints)
+        c, r = self._refpt2circlef(refgrid_col, refgrid_row)
+        # print('* ', refpt, c, r)
+        c = int(np.floor(c))
+        r = int(np.floor(r))
+        # print('=> ', c, r)
+        if c < 0 or c >= self.circles_per_row - 1:
+            return None
+        if r < 0 or r >= self.circles_per_col - 1:
+            return None
+        return GridIndex(col=c, row=r)
+    
+    def _refpt2surrounding_circles(self, refgrid_col, refgrid_row):
+        # Float circle "index" of square marker's center
+        c, r = self._refpt2circlef(refgrid_col, refgrid_row)
+        # print('* ', refpt, c, r)
+        left = int(np.floor(c))
+        top = int(np.floor(r))
+        if left < 0 or left >= self.circles_per_row:
+            return None
+        if top < 0 or top >= self.circles_per_col:
+            return None
+        indices = [GridIndex(row=top, col=left),
+                   GridIndex(row=top+1, col=left),
+                   GridIndex(row=top+1, col=left+1),
+                   GridIndex(row=top, col=left+1)]
+        if any([self._skip_circle_idx(idx.row, idx.col) for idx in indices]):
+            return None
+        return indices
+
+    def _refpt2mm(self, refgrid_col, refgrid_row):
+        # Get (float) indices
+        col, row = self._refpt2circlef(refgrid_col, refgrid_row)
         mx, my = self.computed_margins
-        mm_offset_x = mx + self.r_circles_mm
-        mm_offset_y = my + self.r_circles_mm
-        def circidx2mm(idx):
-            return Point(x=mm_offset_x + idx.col * self.dist_circles_mm,
-                         y=mm_offset_y + idx.row * self.dist_circles_mm)
-        from vito import imvis, imutils
-        import cv2
-        vis = imutils.ensure_c3(self.calibration_template.tpl_full.copy())
-        pt = mm2px(circidx2mm(self.square_topleft_corner))
-        cv2.circle(vis, pt.int_repr(), 3, (255, 0, 0), -1)
-        pt = mm2px(circidx2mm(GridIndex(0, 0)))
-        cv2.circle(vis, pt.int_repr(), 3, (0, 255, 0), -1)
-        pt = mm2px(circidx2mm(GridIndex(3, 2)))
-        cv2.circle(vis, pt.int_repr(), 3, (0, 0, 255), -1)
-        imvis.imshow(vis, "test", wait_ms=-1)
-        
+        mm_first_circ_offset_x = mx + self.r_circles_mm
+        mm_first_circ_offset_y = my + self.r_circles_mm
+        return Point(x=mm_first_circ_offset_x + col * self.dist_circles_mm,
+                     y=mm_first_circ_offset_y + row * self.dist_circles_mm)
 
     
     def _compute_calibration_template(self):
@@ -459,7 +545,7 @@ class PatternSpecificationEddie:
                                     ))
 
 
-# """Test pattern for development."""
+# # """Test pattern for development."""
 # eddie_test_specs_a4 = PatternSpecificationEddie('Eddie Test Pattern A4',
 #     target_width_mm=210, target_height_mm=297,
 #     dia_circles_mm=5, dist_circles_mm=11)

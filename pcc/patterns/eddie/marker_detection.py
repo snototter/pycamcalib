@@ -231,7 +231,7 @@ def _md_find_center_marker_candidates(det_params, preprocessed, vis_img=None):
                            'hull_area': area,
                            'num_corners': len(hull)})
     if debug_shape_extraction:
-        print('Press key to continue')
+        print('Check "shape candidates". Press key to continue')
         imvis.imshow(tmp_vis, 'Shape candidates', wait_ms=-1)
     # Sort candidate shapes by area (descending)
     shapes.sort(key=lambda s: s['hull_area'], reverse=True)
@@ -241,7 +241,7 @@ def _md_find_center_marker_candidates(det_params, preprocessed, vis_img=None):
     for shape in shapes:
         is_candidate = False
         if 3 < shape['num_corners'] <= 8:
-            candidate = _ensure_quadrilateral(shape, preprocessed.original)
+            candidate = _ensure_quadrilateral(shape) #TODO pass image for debug visualizations, preprocessed.original)
             if candidate is not None:
                 is_candidate = True
                 candidate_shapes.append(candidate)
@@ -321,6 +321,7 @@ def _find_center_marker_transform(preprocessed, candidate, det_params, calibrati
 
 
 def _find_initial_grid_points_contours(preproc, transform, pattern_specs, det_params, vis=None):
+    print('WARNING - FINDING INITIAL GRID POINTS BY CONTOURS IS DEPRECATED')
     pyutils.tic('initial grid estimate - contour') #TODO remove
     ctpl = pattern_specs.calibration_template  # Alias
     coords_dst = points2numpy(ctpl.refpts_full_marker)
@@ -428,15 +429,15 @@ def _find_initial_grid_points_correlation(preproc, transform, pattern_specs, det
     if vis is not None:
         cv2.drawContours(vis, [transform.shape['hull']], 0, (200, 0, 200), 3)
     if det_params.debug:
-        print('Press key to continue')
+        print('Check "Points by correlation". Press key to continue')
         imvis.imshow(overlay, 'Points by correlation', wait_ms=-1)
     pyutils.toc('initial grid estimate - correlation') #TODO remove
     return initial_estimates, vis
 
 
 def _find_grid(preproc, transform, pattern_specs, det_params, vis=None):
-    initial_estimates, vis = _find_initial_grid_points_contours(
-            preproc, transform, pattern_specs, det_params, vis)
+    # initial_estimates, vis = _find_initial_grid_points_contours(
+    #         preproc, transform, pattern_specs, det_params, vis)
     initial_estimates, vis = _find_initial_grid_points_correlation(
             preproc, transform, pattern_specs, det_params, vis)
     #TODO refine!
@@ -505,4 +506,3 @@ def find_target(img, pattern_specs, det_params=ContourDetectionParams()):
     #     # det_params:   {sizeof_fmt(asizeof.asizeof(det_params))}
     #     # preprocessed: {sizeof_fmt(asizeof.asizeof(preprocessed))}
     #     # """)
-    #     imvis.imshow(vis, title='contours', wait_ms=-1)
