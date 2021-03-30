@@ -370,6 +370,7 @@ class PatternSpecificationEddie:
         nodes_to_visit = deque()
         nodes_to_visit.append(self._make_reference_point(0, 0))
         nnr = 0
+        visible_count = 0
         reference_points = list()
         while nodes_to_visit:
             n = nodes_to_visit.popleft()
@@ -397,7 +398,8 @@ class PatternSpecificationEddie:
                 reference_points.append(n)
                 if debug:
                     pt = self._mm2px(n.pos_mm_tl)
-                    cv2.putText(vis, f'{nnr:d}', pt.int_repr(), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
+                    # cv2.putText(vis, f'{nnr:d}', pt.int_repr(), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
+                    cv2.putText(vis, f'{len(reference_points)-1:d}', pt.int_repr(), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255), 1)
                     cv2.circle(vis, pt.int_repr(), 3, (255, 0, 0), -1)
                     imvis.imshow(vis, "Reference Grid", wait_ms=1)
         object.__setattr__(self, 'reference_points', reference_points)
