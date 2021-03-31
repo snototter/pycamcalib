@@ -31,6 +31,7 @@ class ReferencePoint:
     pos_mm_tl: Point  # Pos in mm relative to the target's top left corner
     pos_mm_centered: Point # Pos in mm relative to the reference grid
     surrounding_circles: list
+    neighbor_dir: int
 
 
 @dataclass(frozen=True)
@@ -379,7 +380,20 @@ class PatternSpecificationEddie:
                 continue
             nnr += 1
             visited[vidx.row, vidx.col] = True
-            ## 8-neighborhood
+            # # #circle test 31.03. bad idea
+            # # if n.neighbor_dir is None or n.neighbor_dir == 0:
+            # #     nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row-1, neighbor_dir=0))
+            # #     nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row-1, neighbor_dir=0))
+            # # if n.neighbor_dir is None or n.neighbor_dir == 1: 
+            # #     nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row,   neighbor_dir=1))
+            # #     nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row+1, neighbor_dir=1))
+            # # if n.neighbor_dir is None or n.neighbor_dir == 2:
+            # #     nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row+1, neighbor_dir=2))
+            # #     nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row+1, neighbor_dir=2))
+            # # if n.neighbor_dir is None or n.neighbor_dir == 3:
+            # #     nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row,   neighbor_dir=3))
+            # #     nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row-1, neighbor_dir=3))
+            ## 8-neighborhood (works okayish 31.03)
             nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row-1))
             nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row-1))
             nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row))
@@ -388,11 +402,11 @@ class PatternSpecificationEddie:
             nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row+1))
             nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row))
             nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row-1))
-            ## 4-neighborhood
-            # nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row-1))
-            # nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row))
-            # nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row+1))
-            # nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row))
+            # ## 4-neighborhood
+            # # nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row-1))
+            # # nodes_to_visit.append(self._make_reference_point(col=n.col-1, row=n.row))
+            # # nodes_to_visit.append(self._make_reference_point(col=n.col,   row=n.row+1))
+            # # nodes_to_visit.append(self._make_reference_point(col=n.col+1, row=n.row))
 
             if n.surrounding_circles is not None:
                 reference_points.append(n)
@@ -407,11 +421,11 @@ class PatternSpecificationEddie:
             print('Check "reference grid". Press key to continue.')
             imvis.imshow(vis, "Reference Grid", wait_ms=-1)
     
-    def _make_reference_point(self, col, row):
+    def _make_reference_point(self, col, row, neighbor_dir=None):
         mm_tl = self._refpt2mm(col, row)
         mm_center = Point(x=col * self.dist_circles_mm, y=row * self.dist_circles_mm)
         circ = self._refpt2surrounding_circles(col, row)
-        return ReferencePoint(col=col, row=row, pos_mm_tl=mm_tl, pos_mm_centered=mm_center, surrounding_circles=circ)
+        return ReferencePoint(col=col, row=row, pos_mm_tl=mm_tl, pos_mm_centered=mm_center, surrounding_circles=circ, neighbor_dir=neighbor_dir)
 
     def _mm2px(self, pt):
         return Point(x=pt.x / self.target_width_mm * self.calibration_template.tpl_full.shape[1],
