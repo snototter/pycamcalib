@@ -190,6 +190,7 @@ class Alignment(object):
             assert ref_dxdy is not None
             Ji = (dxdy + ref_dxdy) / 2.0
 
+        pu.tic('double loop')
         for u in range(self.height):
             for v in range(self.width):
                 idx = u*self.width + v
@@ -201,8 +202,25 @@ class Alignment(object):
                     J[idx,:] = matmul(Ji_row, self.JwJg[idx])
                 else:
                     raise NotImplementedError()
+        pu.toc('double loop')
+        # J1 = J.copy()
+        # pu.tic('singleloop')
+        # for idx in range(self.height*self.width):
+        #     if self.method in [Method.FC, Method.IC]:
+        #         dd_row = dxdy[idx,:].reshape((1, -1))
+        #         J[idx,:] = matmul(dd_row, self.JwJg[idx])
+        #     elif self.method == Method.ESM:
+        #         Ji_row = Ji[idx,:].reshape((1, -1))
+        #         J[idx,:] = matmul(Ji_row, self.JwJg[idx])
+        #     else:
+        #         raise NotImplementedError()
+        # pu.toc('singleloop')
+        # J2 = J.copy()
+        # assert np.array_equal(J1, J2)
         return J
 
+#TODO rewrite JwJg and J
+# 3rd dimension? JwJg is 2x8 for each pixel
     def _compute_JwJg(self):
         self.JwJg = list()
         for v in range(self.height):
@@ -215,6 +233,8 @@ class Alignment(object):
                 # Shapes: [2x8] = [2x9] * [9x8]
                 JwJg = matmul(Jw, self.Jg)
                 self.JwJg.append(JwJg)
+        print('TODO JwJg 0 & 1 & 700\n',self.JwJg[0], '\n', self.JwJg[1], '\n', self.JwJg[700])
+        print('Jg & shape', self.Jg.shape, '\n', self.Jg)
     
     def _compute_residuals(self, cur_image, ref_image):
         res = 0.0
@@ -448,5 +468,17 @@ def demo():
 
 
 if __name__ == '__main__':
+    # TODO replace loops on jacobian: 3d multiplication (dim 0 is for stacking!)
+    # x = np.random.rand(10, 2, 9)
+    # y = np.random.rand(1, 9, 8) # https://www.geeksforgeeks.org/numpy-3d-matrix-multiplication/
+    # pu.tic('loop')
+    # z1 = np.zeros((10, 2,8), float)
+    # for l in range(10):
+    #     z1[l, :,:] = matmul(x[l, :,:], y)
+    # pu.toc('loop')
+    # pu.tic('np')
+    # z2 = matmul(x, y)
+    # pu.toc('np')
+    # assert np.array_equal(z1, z2)
     logging.basicConfig(level=logging.INFO)
     demo()
