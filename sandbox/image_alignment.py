@@ -2,15 +2,19 @@ import cv2
 from enum import Enum
 import logging
 from vito import imutils, imvis, cam_projections as prj
+from vito import pyutils as pu
 import numpy as np
 
 _logger = logging.getLogger('ImageAlignment')
 
 # Python port of https://github.com/cashiwamochi/LK20_ImageAlignment
 
+#TODO replace matmul by prj.matmul
 def matmul(A, B):
-    if A.ndim == 1 or B.ndim == 1:
-        raise RuntimeError('1Dim inputs!!!')
+    if A.ndim == 1:
+        raise RuntimeError('1Dim inputs FIRST!!!')
+    if B.ndim == 1:
+        raise RuntimeError('1Dim inputs SECOND!!!')
     return np.matmul(A, B)
 
 class Method(Enum):
@@ -32,7 +36,7 @@ def _compute_Jg(sl3_bases):
     """Computes the 9x8 Jacobian Jg."""
     # Paper Eq.(65)
     assert len(sl3_bases) == 8
-    Jg = np.zeros((9, 8), dtype=np.float)
+    Jg = np.zeros((9, 8), dtype=float)
     for col in range(8):
         for j in range(3):
             for k in range(3):
@@ -43,37 +47,37 @@ def _compute_Jg(sl3_bases):
 def _get_SL3_bases():
     """Returns the 8 SL3 bases"""
     bases = list()
-    B = np.zeros((3, 3), dtype=np.float)
+    B = np.zeros((3, 3), dtype=float)
     B[0, 2] = 1
     bases.append(B.copy())
 
-    B = np.zeros((3, 3), dtype=np.float)
+    B = np.zeros((3, 3), dtype=float)
     B[1, 2] = 1
     bases.append(B.copy())
 
-    B = np.zeros((3, 3), dtype=np.float)
+    B = np.zeros((3, 3), dtype=float)
     B[0, 1] = 1
     bases.append(B.copy())
 
-    B = np.zeros((3, 3), dtype=np.float)
+    B = np.zeros((3, 3), dtype=float)
     B[1, 0] = 1
     bases.append(B.copy())
 
-    B = np.zeros((3, 3), dtype=np.float)
+    B = np.zeros((3, 3), dtype=float)
     B[0, 0] = 1
     B[1, 1] = -1
     bases.append(B.copy())
 
-    B = np.zeros((3, 3), dtype=np.float)
+    B = np.zeros((3, 3), dtype=float)
     B[1, 1] = -1
     B[2, 2] = 1
     bases.append(B.copy())
 
-    B = np.zeros((3, 3), dtype=np.float)
+    B = np.zeros((3, 3), dtype=float)
     B[2, 0] = 1
     bases.append(B.copy())
 
-    B = np.zeros((3, 3), dtype=np.float)
+    B = np.zeros((3, 3), dtype=float)
     B[2, 1] = 1
     bases.append(B.copy())
     return bases
@@ -81,42 +85,43 @@ def _get_SL3_bases():
 
 def _image_pyramid(src, num_levels):
     """Creates the Gaussian image pyramid (each level is upsampled to the original src image size)."""
+    # pyrDown requires uint8 inputs
     down_sampled = src.copy()
-
     pyramid = list()
-    # Normalize
+    # Convert to float (and range [0, 1])
     src = src.astype(float) / 255.0
     pyramid.append(src.copy())
-
     for l in range(num_levels - 1):
         down_sampled = cv2.pyrDown(down_sampled.copy())
-        # print(f'L{l}: down sampled size: {down_sampled.shape}')
         up_sampled = down_sampled.copy()
         for m in range(l+1):
             up_sampled = cv2.pyrUp(up_sampled.copy())
-        # print(f'L{l}: up sampled size: {up_sampled.shape}')
         up_sampled = up_sampled.astype(float) / 255.0
         pyramid.append(up_sampled)
-    # for l in range(num_levels):
-    #     cv2.imshow('debug pyramid', pyramid[l])
-    #     cv2.waitKey()
     return pyramid
 
 
 def _image_gradient(image):
-    #TODO use numpy and time it!
-    #FIXME implement today?!
     height, width = image.shape[:2]
-    dxdy = np.zeros((height*width, 2), dtype=np.float)
+    dx = np.column_stack((image[:, 1:] - image[:,:-1], np.zeros((height, 1), dtype=float)))
+    dy = np.row_stack((image[1:,:] - image[:-1, :], np.zeros((1, width), dtype=float)))
+    return np.column_stack((dx.reshape(-1, 1), dy.reshape(-1, 1)))
+
+
+def _image_gradient_loop(image):
+    height, width = image.shape[:2]
+    dxdy = np.zeros((height*width, 2), dtype=float)
     for v in range(height):
         for u in range(width):
-            if u+1 == width or v+1 == height:
+            idx = u + v*width
+            if u+1 == width:
                 dx = 0
-                dy = 0
             else:
                 dx = image[v, u+1] - image[v, u]
+            if v+1 == height:
+                dy = 0
+            else:
                 dy = image[v+1, u] - image[v, u]
-            idx = u + v*width
             dxdy[idx, 0] = dx
             dxdy[idx, 1] = dy
     return dxdy
@@ -139,12 +144,11 @@ class Alignment(object):
         self.template_pyramid = _image_pyramid(self.template_image, self.num_pyramid_levels)        
         self.sl3_bases = _get_SL3_bases()
         self.Jg = _compute_Jg(self.sl3_bases)
-        self.JwJg = list()
+        self.JwJg = None
         self.dxdy = list()  # TODO len == num_pyramid_levels
         self.J = list()  # 1 Jacobian per pyramid level   # TODO len == num_pyramid_levels
         self.H = list()  # 1 Hessian per pyramid level  TODO len == num_pyramid_levels
         self._precompute()
-        # imvis.imshow(self.working_image, 'Working Image', wait_ms=-1)
 
     def set_true_warp(self, H_gt):
         self.H_gt = H_gt.copy()
@@ -162,7 +166,7 @@ class Alignment(object):
         working_image = cv2.GaussianBlur(working_image, self.blur_kernel_size, 0)
         working_pyramid = _image_pyramid(working_image, self.num_pyramid_levels)
         
-        H = np.eye(3, dtype=np.float)
+        H = np.eye(3, dtype=float)
         # Coarse-to-fine:
         for lvl in range(self.num_pyramid_levels):
             pyr_lvl = self.num_pyramid_levels - lvl - 1
@@ -171,20 +175,17 @@ class Alignment(object):
 
         warped = self._warp_current_image(curr_original_image, H)
         return H, warped
-        
+
     def _compute_Hessian(self, J):
         num_params = len(self.sl3_bases)
-        Hessian = np.zeros((num_params, num_params), dtype=np.float)
+        Hessian = np.zeros((num_params, num_params), dtype=float)
         for r in range(J.shape[0]):
             row = J[r,:].reshape((1, -1))
-            # Hessian += matmul(np.transpose(J[r,:]), J[r,:]) #FIXME WRONG! FIXME check transpose and slicing EVERYWHERE!!!!!
             Hessian += matmul(np.transpose(row), row)
-
-        # print('Hessian', Hessian)
         return Hessian
 
     def _compute_Jacobian(self, dxdy, ref_dxdy):
-        J = np.zeros((self.height*self.width, 8), dtype=np.float)
+        J = np.zeros((self.height*self.width, 8), dtype=float)
         if self.method == Method.ESM:
             assert ref_dxdy is not None
             Ji = (dxdy + ref_dxdy) / 2.0
@@ -195,7 +196,6 @@ class Alignment(object):
                 if self.method in [Method.FC, Method.IC]:
                     dd_row = dxdy[idx,:].reshape((1, -1))
                     J[idx,:] = matmul(dd_row, self.JwJg[idx])
-                    # print('multiply', dxdy[idx,:].shape, 'x', self.JwJg[idx].shape, 'to', J[idx,:].shape)
                 elif self.method == Method.ESM:
                     Ji_row = Ji[idx,:].reshape((1, -1))
                     J[idx,:] = matmul(Ji_row, self.JwJg[idx])
@@ -211,14 +211,14 @@ class Alignment(object):
                 Jw = np.array([
                                [u, v, 1, 0, 0, 0, -u*u, -u*v, -u],
                                [0, 0, 0, u, v, 1, -u*v, -v*v, -v]],
-                              dtype=np.float)
+                              dtype=float)
                 # Shapes: [2x8] = [2x9] * [9x8]
                 JwJg = matmul(Jw, self.Jg)
                 self.JwJg.append(JwJg)
     
     def _compute_residuals(self, cur_image, ref_image):
         res = 0.0
-        residuals = np.zeros((self.height*self.width, 1), dtype=np.float)
+        residuals = np.zeros((self.height*self.width, 1), dtype=float)
         for v in range(self.height):
             for u in range(self.width):
                 idx = v*self.width + u
@@ -234,7 +234,7 @@ class Alignment(object):
         return residuals, np.sqrt(res / (self.height * self.width))
 
     def _compute_update_params(self, hessian, J, residuals):
-        params = np.zeros((8, 1), dtype=np.float)
+        params = np.zeros((8, 1), dtype=float)
         hessian_inv = np.linalg.inv(hessian)
         
         for v in range(self.height):
@@ -251,7 +251,7 @@ class Alignment(object):
     def _is_converged(self, curr_error, prev_error):
         if prev_error < 0:
             return False
-        if prev_error < curr_error + 0.0000001: # TODO check numerical stability
+        if prev_error < curr_error + 1e-5:#0.0000001: # TODO check numerical stability
             return True
         return False
     
@@ -309,7 +309,7 @@ class Alignment(object):
                 else:
                     H = H_update.copy()
                     if self.verbose:
-                        self._show_process(self.full_reference_image, H)
+                        self._show_progress(self.full_reference_image, H)
                     continue
             
             if self._is_converged(curr_error, prev_error):
@@ -318,7 +318,7 @@ class Alignment(object):
                 prev_error = curr_error
                 H = H_update.copy()
                 if self.verbose:
-                    self._show_process(self.full_reference_image, H)
+                    self._show_progress(self.full_reference_image, H)
         return H, curr_error
 
     def _process_in_layer(self, tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level):
@@ -330,14 +330,15 @@ class Alignment(object):
             raise NotImplementedError('TODO')
         else:
             raise NotImplementedError()
+        print(f'Method {self.method}, final residual: {error}')
         return H
 
-    def _show_process(self, canvas, H):
-        pts = np.zeros((3, 4), dtype=np.float)
-        pts[:, 0] = np.array([0, 0, 1], dtype=np.float)
-        pts[:, 1] = np.array([self.width, 0, 1], dtype=np.float)
-        pts[:, 2] = np.array([self.width, self.height, 1], dtype=np.float)
-        pts[:, 3] = np.array([0, self.height, 1], dtype=np.float)
+    def _show_progress(self, canvas, H):
+        pts = np.zeros((3, 4), dtype=float)
+        pts[:, 0] = np.array([0, 0, 1], dtype=float)
+        pts[:, 1] = np.array([self.width, 0, 1], dtype=float)
+        pts[:, 2] = np.array([self.width, self.height, 1], dtype=float)
+        pts[:, 3] = np.array([0, self.height, 1], dtype=float)
 
         ref_pts = pts.copy()
         ref_pts = prj.apply_projection(self.H0, ref_pts)
@@ -355,14 +356,14 @@ class Alignment(object):
                 pt1 = (int(pts[0, i]), int(pts[1, i]))
                 pt2 = (int(pts[0, (i+1)%4]), int(pts[1,(i+1)%4]))
                 vis = cv2.line(vis, pt1, pt2, (255, 0, 255), 2)
-        imvis.imshow(vis, title='Process', wait_ms=10)
+        imvis.imshow(vis, title='Progress', wait_ms=20)
 
     def _update_warp(self, params, H):
-        A = np.zeros((3, 3), dtype=np.float)
+        A = np.zeros((3, 3), dtype=float)
         for i in range(8):
-            A += params[i] * self.sl3_bases[i]
-        G = np.zeros((3, 3), dtype=np.float)
-        A_i = np.eye(3, dtype=np.float)
+            A += (params[i] * self.sl3_bases[i])
+        G = np.zeros((3, 3), dtype=float)
+        A_i = np.eye(3, dtype=float)
         factor_i = 1.0
         for i in range(9):
             G += (1.0 / factor_i) * A_i
@@ -393,11 +394,11 @@ def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
     # R_z = prj.rotx3d(rz*0.1/180.0*np.pi)
     # # Original code builds the matrix in ZYX (roll-pitch-yaw) order
     # R = matmul(R_z, matmul(R_y, R_x))
-    # t = np.array([trans_x, trans_y, trans_z], dtype=np.float64).reshape((3,1))
+    # t = np.array([trans_x, trans_y, trans_z], dtype=float64).reshape((3,1))
     # rows, cols = img.shape[:2]
     # K = np.array([[1000, 0, cols/2],
     #               [0, 1000, rows/2],
-    #               [0, 0, 1]], dtype=np.float64)
+    #               [0, 0, 1]], dtype=float64)
     # H = np.zeros_like(R)
     # H[0,0] = R[0,0]
     # H[1,0] = R[1,0]
@@ -413,7 +414,7 @@ def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
     # _logger.info(f'Homography:\n{H}')
     H = np.array([[0.93757391, -0.098535322, -8.3316984],
                   [0.0703476, 0.93736351, -32.40559],
-                  [-4.9997212e-05, -4.9928687e-05, 1]], dtype=np.float)
+                  [-4.9997212e-05, -4.9928687e-05, 1]], dtype=float)
     rows, cols = img.shape[:2]
     warped = cv2.warpPerspective(img, H, (cols, rows), flags=cv2.INTER_LINEAR,
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
@@ -432,7 +433,7 @@ def demo():
     imvis.imshow(warped, 'Simulated Warp', wait_ms=-1)
     
     # Initial estimate H0
-    H0 = np.eye(3, dtype=np.float)
+    H0 = np.eye(3, dtype=float)
     H0[0, 2] = rect[0]
     H0[1, 2] = rect[1]
     _logger.info(f'Initial estimate, H0:\n{H0}')
@@ -440,7 +441,7 @@ def demo():
     print('H0\n', H0)
     print('H_gt\n', H_gt)
 
-    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=6)
+    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=5)
     align.set_true_warp(H_gt)
     H_est, result = align.track(warped, H0)
     imvis.imshow(result, 'Result', wait_ms=-1)
