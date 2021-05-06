@@ -469,7 +469,7 @@ def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
 
 def demo():
     img = imutils.imread('lenna.png')
-    rect = (210, 210, 160, 160) # TODO check with non-square rect
+    rect = (210, 200, 160, 190) # TODO check with non-square rect
     target_template = imutils.roi(img, rect)
     # vis = img.copy()
     # vis = cv2.rectangle(vis, (rect[0], rect[1]), (rect[0]+rect[2], rect[1]+rect[3]), (0, 0, 255), 3)
