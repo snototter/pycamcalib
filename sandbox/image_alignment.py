@@ -8,8 +8,13 @@ import numpy.matlib
 
 _logger = logging.getLogger('ImageAlignment')
 
-# Python port of https://github.com/cashiwamochi/LK20_ImageAlignment
+# Python port (and speed improvements) of https://github.com/cashiwamochi/LK20_ImageAlignment
 
+#TODO list:
+# * vectorize jacobian
+# * vectorize hessian
+# * test with eddy
+# * refactor eddy
 
 #TODO replace matmul by prj.matmul
 def matmul(A, B):
@@ -130,7 +135,7 @@ def _image_pyramid(src, num_levels):
     pyramid = list()
     # Convert to float (and range [0, 1])
     src = src.astype(float) / 255.0
-    pyramid.append(src.copy())  # FIXME enforce size!!!!!!
+    pyramid.append(src.copy())
     for lvl in range(num_levels - 1):
         down_sampled = cv2.pyrDown(down_sampled.copy())
         up_sampled = down_sampled.copy()
@@ -190,9 +195,9 @@ class Alignment(object):
         self.sl3_bases = _get_SL3_bases()
         self.Jg = _compute_Jg(self.sl3_bases)
         self.JwJg = None
-        self.dxdys = list()  # TODO len == num_pyramid_levels
-        self.Js = list()  # 1 Jacobian per pyramid level   # TODO len == num_pyramid_levels
-        self.Hs = list()  # 1 Hessian per pyramid level  TODO len == num_pyramid_levels
+        self.dxdys = None  # Stores precomputed gradients for each pyramid level
+        self.Js = None
+        self.Hs = None
         self._precompute()
 
     def set_true_warp(self, H_gt):
@@ -235,7 +240,7 @@ class Alignment(object):
             assert ref_dxdy is not None
             Ji = (dxdy + ref_dxdy) / 2.0
 
-        # pu.tic('double loop')
+        pu.tic('double loop')
         for u in range(self.height):
             for v in range(self.width):
                 idx = u*self.width + v
@@ -247,7 +252,10 @@ class Alignment(object):
                     J[idx, :] = matmul(Ji_row, self.JwJg[idx])
                 else:
                     raise NotImplementedError()
-        # pu.toc('double loop')
+        pu.toc('double loop')
+        # pu.tic('np')
+
+        # pu.toc('np')    
         # J1 = J.copy()
         # pu.tic('singleloop')
         # for idx in range(self.height*self.width):
@@ -267,6 +275,7 @@ class Alignment(object):
 #TODO rewrite JwJg and J
 # 3rd dimension? JwJg is 2x8 for each pixel
     def _compute_JwJg(self):
+        pu.tic('loop')
         self.JwJg = list()
         for v in range(self.height):
             for u in range(self.width):
@@ -278,6 +287,49 @@ class Alignment(object):
                 # Shapes: [2x8] = [2x9] * [9x8]
                 JwJg = matmul(Jw, self.Jg)
                 self.JwJg.append(JwJg)
+        pu.toc('loop')
+        # TODO 170ms to 6ms using vectorization: (must change jacobian, too)
+        pu.tic('3d')
+        # jwjg = np.zeros(self.height*self.width, 2, 8)
+        u, v = np.meshgrid(np.arange(0, self.width), np.arange(0, self.height))
+        u = u.reshape((-1, ))
+        v = v.reshape((-1, ))
+        jw = np.zeros((self.height*self.width, 2, 9), dtype=float)
+        jw[:, 0, 0] = u
+        jw[:, 0, 1] = v
+        jw[:, 0, 2] = 1
+        jw[:, 0, 6] = -np.multiply(u, u)
+        jw[:, 0, 7] = -np.multiply(u, v)
+        jw[:, 0, 8] = -u
+        jw[:, 1, 3] = u
+        jw[:, 1, 4] = v
+        jw[:, 1, 5] = 1
+        jw[:, 1, 6] = -np.multiply(u, v)
+        jw[:, 1, 7] = -np.multiply(v, v)
+        jw[:, 1, 8] = -v
+
+        jgshape = self.Jg.shape
+        jg = self.Jg.reshape((1, *jgshape))
+        jwjg = matmul(jw, jg)
+        pu.toc('3d')
+        print(f'FIXME {jwjg.shape}')
+        print(f'shape single jwjg: {self.JwJg[0].shape}')
+        for i in range(self.height*self.width):
+            a = jwjg[i,:,:].reshape(self.JwJg[0].shape)
+            b = self.JwJg[i]
+            assert np.array_equal(a, b)
+        # TODO replace loops on jacobian: 3d multiplication (dim 0 is for stacking!)
+    # x = np.random.rand(10, 2, 9)
+    # y = np.random.rand(1, 9, 8) # https://www.geeksforgeeks.org/numpy-3d-matrix-multiplication/
+    # pu.tic('loop')
+    # z1 = np.zeros((10, 2,8), float)
+    # for l in range(10):
+    #     z1[l, :,:] = matmul(x[l, :,:], y)
+    # pu.toc('loop')
+    # pu.tic('np')
+    # z2 = matmul(x, y)
+    # pu.toc('np')
+    # assert np.array_equal(z1, z2)
         # print('TODO JwJg 0 & 1 & 700\n',self.JwJg[0], '\n', self.JwJg[1], '\n', self.JwJg[700])
         # print('Jg & shape', self.Jg.shape, '\n', self.Jg)
 
@@ -593,17 +645,5 @@ def demo():
 
 
 if __name__ == '__main__':
-    # TODO replace loops on jacobian: 3d multiplication (dim 0 is for stacking!)
-    # x = np.random.rand(10, 2, 9)
-    # y = np.random.rand(1, 9, 8) # https://www.geeksforgeeks.org/numpy-3d-matrix-multiplication/
-    # pu.tic('loop')
-    # z1 = np.zeros((10, 2,8), float)
-    # for l in range(10):
-    #     z1[l, :,:] = matmul(x[l, :,:], y)
-    # pu.toc('loop')
-    # pu.tic('np')
-    # z2 = matmul(x, y)
-    # pu.toc('np')
-    # assert np.array_equal(z1, z2)
     logging.basicConfig(level=logging.INFO)
     demo()
