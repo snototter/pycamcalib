@@ -11,8 +11,6 @@ _logger = logging.getLogger('ImageAlignment')
 # Python port (and speed improvements) of https://github.com/cashiwamochi/LK20_ImageAlignment
 
 #TODO list:
-# * vectorize jacobian
-# * vectorize hessian
 # * test with eddy
 # * refactor eddy
 
@@ -230,12 +228,22 @@ class Alignment(object):
         return H, warped
 
     def _compute_Hessian(self, J):
-        num_params = len(self.sl3_bases)
-        Hessian = np.zeros((num_params, num_params), dtype=float)
-        for r in range(J.shape[0]):
-            row = J[r, :].reshape((1, -1))
-            Hessian += matmul(np.transpose(row), row)
-        return Hessian
+        # pu.tic('hess-vec')
+        Hess = matmul(np.transpose(J), J)
+        # pu.toc('hess-vec')
+        # Sped up from ~100ms (loop version) to 0.4ms
+        # pu.tic('hess-loop')
+        # num_params = len(self.sl3_bases)
+        # Hessian = np.zeros((num_params, num_params), dtype=float)
+        # for r in range(J.shape[0]):
+        #     row = J[r, :].reshape((1, -1))
+        #     Hessian += matmul(np.transpose(row), row)
+        # pu.toc('hess-loop')
+        # for r in range(8):
+        #     for c in range(8):
+        #         if Hess[r,c] != Hessian[r,c]:
+        #             print(f'HESSIAN DIFFERS AT {r},{c}: {Hess[r,c]-Hessian[r,c]} {Hess[r,c]} vs {Hessian[r,c]}')
+        return Hess
 
     def _compute_Jacobian(self, dxdy, ref_dxdy=None):
         # Sped up from 70ms (loop version) to 0.8/0.9ms
@@ -488,7 +496,7 @@ class Alignment(object):
         return H, curr_error
 
     def _process_in_layer(self, tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level):
-        pu.tic('proc-layer')
+        # pu.tic('proc-layer')
         if self.method == Method.FC:
             H, error = self._helper_process_fc(tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level)
         elif self.method == Method.IC:
@@ -497,7 +505,7 @@ class Alignment(object):
             H, error = self._helper_process_esm(tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level)
         else:
             raise NotImplementedError()
-        pu.toc('proc-layer')
+        # pu.toc('proc-layer')
         _logger.info(f'{self.method}, final residual on pyramid level [{pyramid_level}]: {error}')
         return H
 
@@ -527,7 +535,7 @@ class Alignment(object):
                 pt1 = (int(pts[0, i]), int(pts[1, i]))
                 pt2 = (int(pts[0, (i+1) % 4]), int(pts[1, (i+1) % 4]))
                 vis = cv2.line(vis, pt1, pt2, (255, 0, 255), 2)
-        imvis.imshow(vis, title='Progress', wait_ms=20)
+        imvis.imshow(vis, title='Progress', wait_ms=10)
 
     def _update_warp(self, params, H):
         A = np.zeros((3, 3), dtype=float)
@@ -540,7 +548,6 @@ class Alignment(object):
             G += (1.0 / factor_i) * A_i
             A_i = matmul(A_i, A)
             factor_i *= (i+1.0)
-        # delta_H = G.copy()
 
         if self.method == Method.IC:
             H = matmul(H, np.linalg.inv(G))
@@ -584,22 +591,23 @@ def demo():
     # print('H0\n', H0)
     # print('H_gt\n', H_gt)
 
+    verbose = True
     pu.tic('FC')
-    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=6, verbose=True)
+    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=6, verbose=verbose)
     align.set_true_warp(H_gt)
     H_est, result = align.align(warped, H0)
     pu.toc('FC')
     imvis.imshow(result, 'Result FC', wait_ms=10)
 
     pu.tic('IC')
-    align = Alignment(target_template, Method.IC, full_reference_image=img, num_pyramid_levels=4, verbose=True)
+    align = Alignment(target_template, Method.IC, full_reference_image=img, num_pyramid_levels=4, verbose=verbose)
     align.set_true_warp(H_gt)
     H_est, result = align.align(warped, H0)
     pu.toc('IC')
     imvis.imshow(result, 'Result IC', wait_ms=10)
 
     pu.tic('ESM')
-    align = Alignment(target_template, Method.ESM, full_reference_image=img, num_pyramid_levels=6, verbose=True)
+    align = Alignment(target_template, Method.ESM, full_reference_image=img, num_pyramid_levels=6, verbose=verbose)
     align.set_true_warp(H_gt)
     H_est, result = align.align(warped, H0)
     pu.toc('ESM')
