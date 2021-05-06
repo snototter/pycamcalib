@@ -365,7 +365,7 @@ class Alignment(object):
     def _is_converged(self, curr_error, prev_error):
         if prev_error < 0:
             return False
-        if prev_error < curr_error + 1e-6: #0.0000001: # TODO check numerical stability
+        if abs(prev_error - curr_error) < 1e-6:#prev_error < curr_error + 1e-6: #0.0000001: # TODO check numerical stability
             return True
         return False
 
@@ -575,8 +575,8 @@ def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
 
 
 def demo():
-    img = imutils.imread('lenna.png')
-    rect = (210, 200, 160, 183)
+    img = imutils.imread('flamingo.jpg')
+    rect = (180, 170, 120, 143)
     target_template = imutils.roi(img, rect)
     imvis.imshow(target_template, 'Template', wait_ms=10)
     warped, H_gt = _generate_warped_image(img, -45, -25, 20, 30, -30, -360)
@@ -593,21 +593,21 @@ def demo():
 
     verbose = True
     pu.tic('FC')
-    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=6, verbose=verbose)
+    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=5, verbose=verbose)
     align.set_true_warp(H_gt)
     H_est, result = align.align(warped, H0)
     pu.toc('FC')
     imvis.imshow(result, 'Result FC', wait_ms=10)
 
     pu.tic('IC')
-    align = Alignment(target_template, Method.IC, full_reference_image=img, num_pyramid_levels=4, verbose=verbose)
+    align = Alignment(target_template, Method.IC, full_reference_image=img, num_pyramid_levels=3, verbose=verbose)
     align.set_true_warp(H_gt)
     H_est, result = align.align(warped, H0)
     pu.toc('IC')
     imvis.imshow(result, 'Result IC', wait_ms=10)
 
     pu.tic('ESM')
-    align = Alignment(target_template, Method.ESM, full_reference_image=img, num_pyramid_levels=6, verbose=verbose)
+    align = Alignment(target_template, Method.ESM, full_reference_image=img, num_pyramid_levels=5, verbose=verbose)
     align.set_true_warp(H_gt)
     H_est, result = align.align(warped, H0)
     pu.toc('ESM')
