@@ -207,7 +207,7 @@ class Alignment(object):
         if self.full_reference_image is None:
             _logger.error('To show the progress, you must provide the full reference image, too!')
 
-    def track(self, image, H0):
+    def align(self, image, H0):
         self.H0 = H0
         if self.verbose:
             vis = self._warp_current_image(image, np.eye(3))
@@ -238,61 +238,68 @@ class Alignment(object):
         return Hessian
 
     def _compute_Jacobian(self, dxdy, ref_dxdy=None):
-        J = np.zeros((self.height*self.width, 8), dtype=float)
+        # Sped up from 70ms (loop version) to 0.8/0.9ms
+        dim_g3d = (self.width*self.height, 1, 2)
         if self.method == Method.ESM:
             assert ref_dxdy is not None
-            Ji = (dxdy + ref_dxdy) / 2.0
-
-        pu.tic('double loop')
-        for u in range(self.height):
-            for v in range(self.width):
-                idx = u*self.width + v
-                if self.method in [Method.FC, Method.IC]:
-                    dd_row = dxdy[idx, :].reshape((1, -1))
-                    J[idx, :] = matmul(dd_row, self.JwJg[idx])
-                elif self.method == Method.ESM:
-                    Ji_row = Ji[idx, :].reshape((1, -1))
-                    J[idx, :] = matmul(Ji_row, self.JwJg[idx])
-                else:
-                    raise NotImplementedError()
-        pu.toc('double loop')
-        # pu.tic('np')
-
-        # pu.toc('np')    
-        # J1 = J.copy()
-        # pu.tic('singleloop')
-        # for idx in range(self.height*self.width):
-        #     if self.method in [Method.FC, Method.IC]:
-        #         dd_row = dxdy[idx,:].reshape((1, -1))
-        #         J[idx,:] = matmul(dd_row, self.JwJg[idx])
-        #     elif self.method == Method.ESM:
-        #         Ji_row = Ji[idx,:].reshape((1, -1))
-        #         J[idx,:] = matmul(Ji_row, self.JwJg[idx])
-        #     else:
-        #         raise NotImplementedError()
-        # pu.toc('singleloop')
-        # J2 = J.copy()
-        # assert np.array_equal(J1, J2)
+            grad = ((dxdy + ref_dxdy) / 2.0).reshape(dim_g3d)
+        elif self.method in [Method.FC, Method.IC]:
+            grad = dxdy.reshape(dim_g3d)
+        else:
+            raise NotImplementedError()
+        J3d = matmul(grad, self.JwJg)
+        J = J3d.reshape((self.height * self.width, self.JwJg.shape[2]))
         return J
+        # J = np.zeros((self.height*self.width, 8), dtype=float)
+        # if self.method == Method.ESM:
+        #     assert ref_dxdy is not None
+        #     Ji = (dxdy + ref_dxdy) / 2.0
 
-#TODO rewrite JwJg and J
-# 3rd dimension? JwJg is 2x8 for each pixel
+        # pu.tic('double loop')
+        # for u in range(self.height):
+        #     for v in range(self.width):
+        #         idx = u*self.width + v
+        #         if self.method in [Method.FC, Method.IC]:
+        #             dd_row = dxdy[idx, :].reshape((1, -1))
+        #             J[idx, :] = matmul(dd_row, self.JwJg_list[idx])
+        #         elif self.method == Method.ESM:
+        #             Ji_row = Ji[idx, :].reshape((1, -1))
+        #             J[idx, :] = matmul(Ji_row, self.JwJg_list[idx])
+        #         else:
+        #             raise NotImplementedError()
+        # pu.toc('double loop')
+        # pu.tic('np')
+        # if self.method in [Method.FC, Method.IC]:
+        #     grad = dxdy.reshape((self.width*self.height, 1, 2))
+        #     print(f'MULTIPLYING {grad.shape} * {self.JwJg.shape}')
+        #     j = matmul(grad, self.JwJg)
+        # else:
+        #     raise NotImplementedError()
+        # pu.toc('np')
+        # x = j.reshape((self.width*self.height, 8))
+        # print(j.shape)
+        # for i in range(self.height*self.width):
+        #     if not np.array_equal(x[i,:], J[i,:]):
+        #         print(f'Mismatch at pixel idx {i}')
+        # assert np.array_equal(x, J)
+        # return J
+
     def _compute_JwJg(self):
-        pu.tic('loop')
-        self.JwJg = list()
-        for v in range(self.height):
-            for u in range(self.width):
-                # Eq.(63)
-                Jw = np.array([
-                               [u, v, 1, 0, 0, 0, -u*u, -u*v, -u],
-                               [0, 0, 0, u, v, 1, -u*v, -v*v, -v]],
-                              dtype=float)
-                # Shapes: [2x8] = [2x9] * [9x8]
-                JwJg = matmul(Jw, self.Jg)
-                self.JwJg.append(JwJg)
-        pu.toc('loop')
-        # TODO 170ms to 6ms using vectorization: (must change jacobian, too)
-        pu.tic('3d')
+        # Sped up from 170ms to 6ms
+        # pu.tic('loop')
+        # self.JwJg_list = list()
+        # for v in range(self.height):
+        #     for u in range(self.width):
+        #         # Eq.(63)
+        #         Jw = np.array([
+        #                        [u, v, 1, 0, 0, 0, -u*u, -u*v, -u],
+        #                        [0, 0, 0, u, v, 1, -u*v, -v*v, -v]],
+        #                       dtype=float)
+        #         # Shapes: [2x8] = [2x9] * [9x8]
+        #         JwJg = matmul(Jw, self.Jg)
+        #         self.JwJg_list.append(JwJg)
+        # pu.toc('loop')
+        # pu.tic('3d')
         # jwjg = np.zeros(self.height*self.width, 2, 8)
         u, v = np.meshgrid(np.arange(0, self.width), np.arange(0, self.height))
         u = u.reshape((-1, ))
@@ -313,28 +320,7 @@ class Alignment(object):
 
         jgshape = self.Jg.shape
         jg = self.Jg.reshape((1, *jgshape))
-        jwjg = matmul(jw, jg)
-        pu.toc('3d')
-        print(f'FIXME {jwjg.shape}')
-        print(f'shape single jwjg: {self.JwJg[0].shape}')
-        for i in range(self.height*self.width):
-            a = jwjg[i,:,:].reshape(self.JwJg[0].shape)
-            b = self.JwJg[i]
-            assert np.array_equal(a, b)
-        # TODO replace loops on jacobian: 3d multiplication (dim 0 is for stacking!)
-    # x = np.random.rand(10, 2, 9)
-    # y = np.random.rand(1, 9, 8) # https://www.geeksforgeeks.org/numpy-3d-matrix-multiplication/
-    # pu.tic('loop')
-    # z1 = np.zeros((10, 2,8), float)
-    # for l in range(10):
-    #     z1[l, :,:] = matmul(x[l, :,:], y)
-    # pu.toc('loop')
-    # pu.tic('np')
-    # z2 = matmul(x, y)
-    # pu.toc('np')
-    # assert np.array_equal(z1, z2)
-        # print('TODO JwJg 0 & 1 & 700\n',self.JwJg[0], '\n', self.JwJg[1], '\n', self.JwJg[700])
-        # print('Jg & shape', self.Jg.shape, '\n', self.Jg)
+        self.JwJg = matmul(jw, jg)
 
     def _compute_residuals(self, cur_image, ref_image):
         res = 0.0
@@ -502,6 +488,7 @@ class Alignment(object):
         return H, curr_error
 
     def _process_in_layer(self, tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level):
+        pu.tic('proc-layer')
         if self.method == Method.FC:
             H, error = self._helper_process_fc(tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level)
         elif self.method == Method.IC:
@@ -510,6 +497,7 @@ class Alignment(object):
             H, error = self._helper_process_esm(tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level)
         else:
             raise NotImplementedError()
+        pu.toc('proc-layer')
         _logger.info(f'{self.method}, final residual on pyramid level [{pyramid_level}]: {error}')
         return H
 
@@ -570,39 +558,9 @@ class Alignment(object):
 
 
 def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
-    #TODO doesn't yield the same result as the Cpp simulator version
-    # trans_x = 0.001 * tx
-    # trans_y = 0.001 * ty
-    # trans_z = 1 + 0.001 * tz
-    # R_x = prj.rotx3d(rx*0.1/180.0*np.pi)
-    # R_y = prj.rotx3d(ry*0.1/180.0*np.pi)
-    # R_z = prj.rotx3d(rz*0.1/180.0*np.pi)
-    # # Original code builds the matrix in ZYX (roll-pitch-yaw) order
-    # R = matmul(R_z, matmul(R_y, R_x))
-    # t = np.array([trans_x, trans_y, trans_z], dtype=float64).reshape((3,1))
-    # rows, cols = img.shape[:2]
-    # K = np.array([[1000, 0, cols/2],
-    #               [0, 1000, rows/2],
-    #               [0, 0, 1]], dtype=float64)
-    # H = np.zeros_like(R)
-    # H[0,0] = R[0,0]
-    # H[1,0] = R[1,0]
-    # H[2,0] = R[2,0]
-    # H[0,1] = R[0,1]
-    # H[1,1] = R[1,1]
-    # H[2,1] = R[2,1]
-    # H[0,2] = t[0,0]
-    # H[1,2] = t[1,0]
-    # H[2,2] = t[2,0]
-    # H = matmul(K, matmul(H, np.linalg.inv(K)))
-    # H /= H[2, 2]
-    # _logger.info(f'Homography:\n{H}')
     H = np.array([[0.93757391, -0.098535322, -8.3316984],
                   [0.0703476, 0.93736351, -32.40559],
                   [-4.9997212e-05, -4.9928687e-05, 1]], dtype=float)
-    # H = np.array([[0.93757391, -0.098535322, -10.3316984],
-    #               [0.0703476, 0.93736351, -40.40559],
-    #               [-4.9997212e-05, -1.9928687e-05, 1]], dtype=float)
     rows, cols = img.shape[:2]
     warped = cv2.warpPerspective(img, H, (cols, rows), flags=cv2.INTER_LINEAR,
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
@@ -611,11 +569,8 @@ def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
 
 def demo():
     img = imutils.imread('lenna.png')
-    rect = (210, 200, 160, 190) # TODO check with non-square rect
+    rect = (210, 200, 160, 183)
     target_template = imutils.roi(img, rect)
-    # vis = img.copy()
-    # vis = cv2.rectangle(vis, (rect[0], rect[1]), (rect[0]+rect[2], rect[1]+rect[3]), (0, 0, 255), 3)
-    # imvis.imshow(vis, 'Input', wait_ms=10)
     imvis.imshow(target_template, 'Template', wait_ms=10)
     warped, H_gt = _generate_warped_image(img, -45, -25, 20, 30, -30, -360)
     imvis.imshow(warped, 'Simulated Warp', wait_ms=10)
@@ -626,28 +581,27 @@ def demo():
     H0[1, 2] = rect[1]
     _logger.info(f'Initial estimate, H0:\n{H0}')
 
-    print('H0\n', H0)
-    print('H_gt\n', H_gt)
-
+    # print('H0\n', H0)
+    # print('H_gt\n', H_gt)
 
     pu.tic('FC')
     align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=6, verbose=True)
     align.set_true_warp(H_gt)
-    H_est, result = align.track(warped, H0)
+    H_est, result = align.align(warped, H0)
     pu.toc('FC')
     imvis.imshow(result, 'Result FC', wait_ms=10)
 
     pu.tic('IC')
     align = Alignment(target_template, Method.IC, full_reference_image=img, num_pyramid_levels=4, verbose=True)
     align.set_true_warp(H_gt)
-    H_est, result = align.track(warped, H0)
+    H_est, result = align.align(warped, H0)
     pu.toc('IC')
     imvis.imshow(result, 'Result IC', wait_ms=10)
 
     pu.tic('ESM')
     align = Alignment(target_template, Method.ESM, full_reference_image=img, num_pyramid_levels=6, verbose=True)
     align.set_true_warp(H_gt)
-    H_est, result = align.track(warped, H0)
+    H_est, result = align.align(warped, H0)
     pu.toc('ESM')
     imvis.imshow(result, 'Result ESM', wait_ms=-1)
 
