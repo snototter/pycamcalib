@@ -178,9 +178,11 @@ def _image_gradient_loop(image):
 
 
 class Alignment(object):
-    def __init__(self, image, method=Method.ESM, num_pyramid_levels=4, blur_kernel_size=(5, 5), max_iterations=50, full_reference_image=None):
+    def __init__(self, image, method=Method.ESM, num_pyramid_levels=4,
+                 blur_kernel_size=(5, 5), max_iterations=50,
+                 verbose=False, full_reference_image=None):
         # TODO if verbose is True, you must provide the full reference image, too!
-        self.verbose = False
+        self.verbose = verbose
         self.full_reference_image = full_reference_image
         self.template_image = imutils.grayscale(image)
         self.height, self.width = image.shape[:2]
@@ -204,12 +206,13 @@ class Alignment(object):
         self.H_gt = H_gt.copy()
         if self.full_reference_image is None:
             _logger.error('To show the progress, you must provide the full reference image, too!')
-            self.verbose = False
-        else:
-            self.verbose = True
 
     def track(self, image, H0):
         self.H0 = H0
+        if self.verbose:
+            vis = self._warp_current_image(image, np.eye(3))
+            imvis.imshow(vis, 'Initial Warp', wait_ms=10)
+
 
         curr_original_image = image.copy()
         working_image = imutils.grayscale(image)
@@ -561,6 +564,8 @@ class Alignment(object):
         res = cv2.warpPerspective(img, prj.matmul(self.H0, H), (self.width, self.height),
                                  flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP,
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
+        if self.verbose:
+            imvis.imshow(res, 'Current Warp', wait_ms=10)
         return res
 
 
@@ -595,6 +600,9 @@ def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
     H = np.array([[0.93757391, -0.098535322, -8.3316984],
                   [0.0703476, 0.93736351, -32.40559],
                   [-4.9997212e-05, -4.9928687e-05, 1]], dtype=float)
+    # H = np.array([[0.93757391, -0.098535322, -10.3316984],
+    #               [0.0703476, 0.93736351, -40.40559],
+    #               [-4.9997212e-05, -1.9928687e-05, 1]], dtype=float)
     rows, cols = img.shape[:2]
     warped = cv2.warpPerspective(img, H, (cols, rows), flags=cv2.INTER_LINEAR,
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
@@ -623,21 +631,21 @@ def demo():
 
 
     pu.tic('FC')
-    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=5)
+    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=6, verbose=True)
     align.set_true_warp(H_gt)
     H_est, result = align.track(warped, H0)
     pu.toc('FC')
     imvis.imshow(result, 'Result FC', wait_ms=10)
 
     pu.tic('IC')
-    align = Alignment(target_template, Method.IC, full_reference_image=img, num_pyramid_levels=4)
+    align = Alignment(target_template, Method.IC, full_reference_image=img, num_pyramid_levels=4, verbose=True)
     align.set_true_warp(H_gt)
     H_est, result = align.track(warped, H0)
     pu.toc('IC')
     imvis.imshow(result, 'Result IC', wait_ms=10)
 
     pu.tic('ESM')
-    align = Alignment(target_template, Method.ESM, full_reference_image=img, num_pyramid_levels=5)
+    align = Alignment(target_template, Method.ESM, full_reference_image=img, num_pyramid_levels=6, verbose=True)
     align.set_true_warp(H_gt)
     H_est, result = align.track(warped, H0)
     pu.toc('ESM')
