@@ -5,6 +5,7 @@ from vito import imutils, imvis, cam_projections as prj
 from vito import pyutils as pu
 import numpy as np
 import numpy.matlib
+from . import img_utils
 
 _logger = logging.getLogger('ImageAlignment')
 
@@ -14,13 +15,13 @@ _logger = logging.getLogger('ImageAlignment')
 # * test with eddy
 # * refactor eddy
 
-#TODO replace matmul by prj.matmul
-def matmul(A, B):
-    if A.ndim == 1:
-        raise RuntimeError('1Dim inputs FIRST!!!')
-    if B.ndim == 1:
-        raise RuntimeError('1Dim inputs SECOND!!!')
-    return np.matmul(A, B)
+# #TODO use to ensure correct shapes (remove before release)
+# def matmul(A, B):
+#     if A.ndim == 1:
+#         raise RuntimeError('1Dim inputs FIRST!!!')
+#     if B.ndim == 1:
+#         raise RuntimeError('1Dim inputs SECOND!!!')
+#     return np.matmul(A, B)
 
 
 class Method(Enum):
@@ -89,92 +90,6 @@ def _get_SL3_bases():
     return bases
 
 
-def _adjust_size(img, target_width, target_height):
-    """Center crops and/or pads (with border row/column) the image to have the expected size."""
-    h, w = img.shape[:2]
-    delta_h = h - target_height
-    if delta_h < 0:
-        delta_h *= -1
-        pad_top = delta_h // 2
-        pad_bottom = delta_h - pad_top
-        if pad_top > 0:
-            pad = np.matlib.repmat(img[0, :], pad_top, 1)
-            img = np.row_stack((pad, img))
-        if pad_bottom > 0:
-            pad = np.matlib.repmat(img[-1, :], pad_bottom, 1)
-            img = np.row_stack((img, pad))
-    elif delta_h > 0:
-        offset = delta_h // 2
-        img = imutils.crop(img, [0, offset, w, target_height])
-    h = img.shape[0]
-
-    delta_w = w - target_width
-    if delta_w < 0:
-        delta_w *= -1
-        pad_left = delta_w // 2
-        pad_right = delta_w - pad_left
-        if pad_left > 0:
-            pad = np.matlib.repmat(img[:, 0], 1, pad_left)
-            img = np.column_stack((pad, img))
-        if pad_right > 0:
-            pad = np.matlib.repmat(img[:, -1], 1, pad_right)
-            img = np.column_stack((img, pad))
-    elif delta_w > 0:
-        offset = delta_w // 2
-        img = imutils.crop(img, [offset, 0, target_width, h])
-    return img
-
-
-def _image_pyramid(src, num_levels):
-    """Creates the Gaussian image pyramid (each level is upsampled to the original src image size)."""
-    target_height, target_width = src.shape[:2]
-    # pyrDown requires uint8 inputs
-    down_sampled = src.copy()
-    pyramid = list()
-    # Convert to float (and range [0, 1])
-    src = src.astype(float) / 255.0
-    pyramid.append(src.copy())
-    for lvl in range(num_levels - 1):
-        down_sampled = cv2.pyrDown(down_sampled.copy())
-        up_sampled = down_sampled.copy()
-        for m in range(lvl+1):
-            height, width = up_sampled.shape[:2]
-            up_sampled = cv2.pyrUp(up_sampled.copy())
-        up_sampled = up_sampled.astype(float) / 255.0
-        # We must enforce correct size to avoid dimensionality mismatch
-        height, width = up_sampled.shape[:2]
-        if height != target_height or width != target_width:
-            up_sampled = _adjust_size(up_sampled, target_width, target_height)
-        pyramid.append(up_sampled)
-    return pyramid
-
-
-def _image_gradient(image):
-    height, width = image.shape[:2]
-    dx = np.column_stack((image[:, 1:] - image[:, :-1], np.zeros((height, 1), dtype=float)))
-    dy = np.row_stack((image[1:, :] - image[:-1, :], np.zeros((1, width), dtype=float)))
-    return np.column_stack((dx.reshape(-1, 1), dy.reshape(-1, 1)))
-
-
-def _image_gradient_loop(image):
-    height, width = image.shape[:2]
-    dxdy = np.zeros((height*width, 2), dtype=float)
-    for v in range(height):
-        for u in range(width):
-            idx = u + v*width
-            if u+1 == width:
-                dx = 0
-            else:
-                dx = image[v, u+1] - image[v, u]
-            if v+1 == height:
-                dy = 0
-            else:
-                dy = image[v+1, u] - image[v, u]
-            dxdy[idx, 0] = dx
-            dxdy[idx, 1] = dy
-    return dxdy
-
-
 class Alignment(object):
     def __init__(self, image, method=Method.ESM, num_pyramid_levels=4,
                  blur_kernel_size=(5, 5), max_iterations=50,
@@ -191,7 +106,7 @@ class Alignment(object):
         self.num_pyramid_levels = num_pyramid_levels
         self.blur_kernel_size = blur_kernel_size
         self.template_image = cv2.GaussianBlur(self.template_image, self.blur_kernel_size, 0)
-        self.template_pyramid = _image_pyramid(self.template_image, self.num_pyramid_levels)      
+        self.template_pyramid = img_utils.image_pyramid(self.template_image, self.num_pyramid_levels)      
         self.sl3_bases = _get_SL3_bases()
         self.Jg = _compute_Jg(self.sl3_bases)
         self.JwJg = None
@@ -215,7 +130,7 @@ class Alignment(object):
         curr_original_image = image.copy()
         working_image = imutils.grayscale(image)
         working_image = cv2.GaussianBlur(working_image, self.blur_kernel_size, 0)
-        working_pyramid = _image_pyramid(working_image, self.num_pyramid_levels)
+        working_pyramid = img_utils.image_pyramid(working_image, self.num_pyramid_levels)
 
         H = np.eye(3, dtype=float)
         # Coarse-to-fine:
@@ -229,7 +144,7 @@ class Alignment(object):
 
     def _compute_Hessian(self, J):
         # pu.tic('hess-vec')
-        Hess = matmul(np.transpose(J), J)
+        Hess = prj.matmul(np.transpose(J), J)
         # pu.toc('hess-vec')
         # Sped up from ~100ms (loop version) to 0.4ms
         # pu.tic('hess-loop')
@@ -237,7 +152,7 @@ class Alignment(object):
         # Hessian = np.zeros((num_params, num_params), dtype=float)
         # for r in range(J.shape[0]):
         #     row = J[r, :].reshape((1, -1))
-        #     Hessian += matmul(np.transpose(row), row)
+        #     Hessian += prj.matmul(np.transpose(row), row)
         # pu.toc('hess-loop')
         # for r in range(8):
         #     for c in range(8):
@@ -255,7 +170,7 @@ class Alignment(object):
             grad = dxdy.reshape(dim_g3d)
         else:
             raise NotImplementedError()
-        J3d = matmul(grad, self.JwJg)
+        J3d = prj.matmul(grad, self.JwJg)
         J = J3d.reshape((self.height * self.width, self.JwJg.shape[2]))
         return J
         # J = np.zeros((self.height*self.width, 8), dtype=float)
@@ -269,10 +184,10 @@ class Alignment(object):
         #         idx = u*self.width + v
         #         if self.method in [Method.FC, Method.IC]:
         #             dd_row = dxdy[idx, :].reshape((1, -1))
-        #             J[idx, :] = matmul(dd_row, self.JwJg_list[idx])
+        #             J[idx, :] = prj.matmul(dd_row, self.JwJg_list[idx])
         #         elif self.method == Method.ESM:
         #             Ji_row = Ji[idx, :].reshape((1, -1))
-        #             J[idx, :] = matmul(Ji_row, self.JwJg_list[idx])
+        #             J[idx, :] = prj.matmul(Ji_row, self.JwJg_list[idx])
         #         else:
         #             raise NotImplementedError()
         # pu.toc('double loop')
@@ -280,7 +195,7 @@ class Alignment(object):
         # if self.method in [Method.FC, Method.IC]:
         #     grad = dxdy.reshape((self.width*self.height, 1, 2))
         #     print(f'MULTIPLYING {grad.shape} * {self.JwJg.shape}')
-        #     j = matmul(grad, self.JwJg)
+        #     j = prj.matmul(grad, self.JwJg)
         # else:
         #     raise NotImplementedError()
         # pu.toc('np')
@@ -304,7 +219,7 @@ class Alignment(object):
         #                        [0, 0, 0, u, v, 1, -u*v, -v*v, -v]],
         #                       dtype=float)
         #         # Shapes: [2x8] = [2x9] * [9x8]
-        #         JwJg = matmul(Jw, self.Jg)
+        #         JwJg = prj.matmul(Jw, self.Jg)
         #         self.JwJg_list.append(JwJg)
         # pu.toc('loop')
         # pu.tic('3d')
@@ -328,7 +243,7 @@ class Alignment(object):
 
         jgshape = self.Jg.shape
         jg = self.Jg.reshape((1, *jgshape))
-        self.JwJg = matmul(jw, jg)
+        self.JwJg = prj.matmul(jw, jg)
 
     def _compute_residuals(self, cur_image, ref_image):
         res = 0.0
@@ -359,7 +274,7 @@ class Alignment(object):
                     params += -1 * np.transpose(J_row) * residuals[idx, 0]
                 else:
                     params += np.transpose(J_row) * residuals[idx, 0]
-        params = matmul(hessian_inv, params)
+        params = prj.matmul(hessian_inv, params)
         return params
 
     def _is_converged(self, curr_error, prev_error):
@@ -378,14 +293,14 @@ class Alignment(object):
             self.Js = list()
             self.Hs = list()
             for lvl in range(self.num_pyramid_levels):
-                dxdy = _image_gradient(self.template_pyramid[lvl])
+                dxdy = img_utils.image_gradient(self.template_pyramid[lvl])
                 self.dxdys.append(dxdy.copy())
                 J = self._compute_Jacobian(dxdy)
                 self.Js.append(J.copy())
                 self.Hs.append(self._compute_Hessian(J).copy())
         elif self.method == Method.ESM:
             self._compute_JwJg()
-            self.dxdys = [_image_gradient(self.template_pyramid[lvl]) for lvl in range(self.num_pyramid_levels)]
+            self.dxdys = [img_utils.image_gradient(self.template_pyramid[lvl]) for lvl in range(self.num_pyramid_levels)]
         else:
             raise NotImplementedError()
 
@@ -398,7 +313,7 @@ class Alignment(object):
             # imvis.imshow(cur_working_image, "warped current image", wait_ms=-1)
             residuals, curr_error = self._compute_residuals(curr_working_image, ref_image_pyramid)
             _logger.info(f'Iteration[{iteration:3d}] Level[{pyramid_level}]: {curr_error:.6f}')
-            dxdy = _image_gradient(curr_working_image)
+            dxdy = img_utils.image_gradient(curr_working_image)
             J = self._compute_Jacobian(dxdy, None)
             Hessian = self._compute_Hessian(J)
             update_params = self._compute_update_params(Hessian, J, residuals)
@@ -467,7 +382,7 @@ class Alignment(object):
             curr_working_image = self._warp_current_image(curr_image_pyramid, H)
             residuals, curr_error = self._compute_residuals(curr_working_image, ref_image_pyramid)
             _logger.info(f'Iteration[{iteration:3d}] Level[{pyramid_level}]: {curr_error:.6f}')
-            dxdy = _image_gradient(curr_working_image)
+            dxdy = img_utils.image_gradient(curr_working_image)
             J = self._compute_Jacobian(dxdy, self.dxdys[pyramid_level])
             Hess = self._compute_Hessian(J)
             update_params = self._compute_update_params(Hess, J, residuals)
@@ -522,7 +437,7 @@ class Alignment(object):
         ref_pts = pts.copy()
         ref_pts = prj.apply_projection(self.H0, ref_pts)
         if self.H_gt is not None:
-            P = matmul(self.H0, matmul(np.linalg.inv(H), matmul(np.linalg.inv(self.H0), matmul(self.H_gt, self.H0))))
+            P = prj.matmul(self.H0, prj.matmul(np.linalg.inv(H), prj.matmul(np.linalg.inv(self.H0), prj.matmul(self.H_gt, self.H0))))
             pts = prj.apply_projection(P, pts)
 
         vis = self.full_reference_image.copy()
@@ -546,13 +461,13 @@ class Alignment(object):
         factor_i = 1.0
         for i in range(9):
             G += (1.0 / factor_i) * A_i
-            A_i = matmul(A_i, A)
+            A_i = prj.matmul(A_i, A)
             factor_i *= (i+1.0)
 
         if self.method == Method.IC:
-            H = matmul(H, np.linalg.inv(G))
+            H = prj.matmul(H, np.linalg.inv(G))
         elif self.method in [Method.FC, Method.ESM]:
-            H = matmul(H, G)
+            H = prj.matmul(H, G)
         return H
 
     def _warp_current_image(self, img, H):
@@ -562,58 +477,3 @@ class Alignment(object):
         if self.verbose:
             imvis.imshow(res, 'Current Warp', wait_ms=10)
         return res
-
-
-def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
-    H = np.array([[0.93757391, -0.098535322, -8.3316984],
-                  [0.0703476, 0.93736351, -32.40559],
-                  [-4.9997212e-05, -4.9928687e-05, 1]], dtype=float)
-    rows, cols = img.shape[:2]
-    warped = cv2.warpPerspective(img, H, (cols, rows), flags=cv2.INTER_LINEAR,
-                                 borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
-    return warped, H
-
-
-def demo():
-    img = imutils.imread('flamingo.jpg')
-    rect = (180, 170, 120, 143)
-    target_template = imutils.roi(img, rect)
-    imvis.imshow(target_template, 'Template', wait_ms=10)
-    warped, H_gt = _generate_warped_image(img, -45, -25, 20, 30, -30, -360)
-    imvis.imshow(warped, 'Simulated Warp', wait_ms=10)
-    
-    # Initial estimate H0
-    H0 = np.eye(3, dtype=float)
-    H0[0, 2] = rect[0]
-    H0[1, 2] = rect[1]
-    _logger.info(f'Initial estimate, H0:\n{H0}')
-
-    # print('H0\n', H0)
-    # print('H_gt\n', H_gt)
-
-    verbose = True
-    pu.tic('FC')
-    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=5, verbose=verbose)
-    align.set_true_warp(H_gt)
-    H_est, result = align.align(warped, H0)
-    pu.toc('FC')
-    imvis.imshow(result, 'Result FC', wait_ms=10)
-
-    pu.tic('IC')
-    align = Alignment(target_template, Method.IC, full_reference_image=img, num_pyramid_levels=3, verbose=verbose)
-    align.set_true_warp(H_gt)
-    H_est, result = align.align(warped, H0)
-    pu.toc('IC')
-    imvis.imshow(result, 'Result IC', wait_ms=10)
-
-    pu.tic('ESM')
-    align = Alignment(target_template, Method.ESM, full_reference_image=img, num_pyramid_levels=5, verbose=verbose)
-    align.set_true_warp(H_gt)
-    H_est, result = align.align(warped, H0)
-    pu.toc('ESM')
-    imvis.imshow(result, 'Result ESM', wait_ms=-1)
-
-
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    demo()

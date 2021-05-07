@@ -1,8 +1,1 @@
-vito>=1.5.0
-wheel
-svglib
-svgwrite
-dataclasses
-opencv-python
-pyside2
-#opencv-contrib-python  # Required for FLD line segment detector
+.
