@@ -9,7 +9,7 @@ setuptools.setup(
     name="pcc",
     version='0.1', #loaded_vars['__version__'],
     author="snototter",
-    author_email="muspellr@gmail.com",
+    author_email="snototter@users.noreply.github.com",
     description="Intrinsic camera calibration utility.",
     url="https://github.com/snototter/pycamcalib",
     packages=setuptools.find_packages(),
