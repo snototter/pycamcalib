@@ -142,6 +142,7 @@ class Alignment(object):
         self.blur_kernel_size = blur_kernel_size
         self.template_image = cv2.GaussianBlur(self.template_image, self.blur_kernel_size, 0)
         self.template_pyramid = _image_pyramid(self.template_image, self.num_pyramid_levels)        
+        self.template_dxdy = None
         self.sl3_bases = _get_SL3_bases()
         self.Jg = _compute_Jg(self.sl3_bases)
         self.JwJg = None
@@ -217,6 +218,23 @@ class Alignment(object):
         # pu.toc('singleloop')
         # J2 = J.copy()
         # assert np.array_equal(J1, J2)
+
+        # #FIXME use matrix multiplication (rewrite jwjg, dxdy, etc)
+        # # including preprocessing: 14ms
+        # # matmul only: 1.5ms
+        # # vs single loop 57ms
+        # # vs double loop 60ms
+        # h, w = dxdy.shape
+        # dxdy3d = dxdy.reshape((h, 1, w))
+        # jwjg = np.empty((len(self.JwJg), w, 8))
+        # for idx in range(self.height*self.width):
+        #     jwjg[idx,:,:] = self.JwJg[idx]
+        # print('SHAPES:', J.shape, dxdy.shape, '...single jwjg:', self.JwJg[0].shape)
+        # print('Multiply', dxdy3d.shape , '*', jwjg.shape)
+        # pu.tic('matmul')
+        # J3 = matmul(dxdy3d, jwjg)
+        # pu.toc('matmul')
+        # assert np.array_equal(J3.reshape((self.height*self.width, -1)), J)
         return J
 
 #TODO rewrite JwJg and J
@@ -243,7 +261,7 @@ class Alignment(object):
             for u in range(self.width):
                 idx = v*self.width + u
                 r = 0
-                if self.method in [Method.IC or Method.ESM]:
+                if self.method in [Method.IC, Method.ESM]:
                     r = cur_image[v, u] - ref_image[v, u]
                 elif self.method == Method.FC:
                     r = ref_image[v, u] - cur_image[v, u]
@@ -271,7 +289,7 @@ class Alignment(object):
     def _is_converged(self, curr_error, prev_error):
         if prev_error < 0:
             return False
-        if prev_error < curr_error + 1e-5:#0.0000001: # TODO check numerical stability
+        if prev_error < curr_error + 1e-4:#0.0000001: # TODO check numerical stability
             return True
         return False
     
@@ -280,11 +298,19 @@ class Alignment(object):
             self._compute_JwJg()
         elif self.method == Method.IC:
             self._compute_JwJg()
-            #TODO
+            #TODO double-check c++ port
 # mvm_ref_DxDy.clear(); mvm_ref_DxDy.reserve(m_pyramid_level);
 # mvm_J.clear(); mvm_J.reserve(m_pyramid_level);
 # mvm_hessian.clear(); mvm_hessian.reserve(m_pyramid_level);
-
+            # self.template_dxdy = list()
+            self.J = list()
+            self.H = list()
+            for lvl in range(self.num_pyramid_levels):
+                dxdy = _image_gradient(self.template_pyramid[lvl])
+                # self.template_dxdy.append(dxdy)
+                J = self._compute_Jacobian(dxdy, None)
+                self.J.append(J)
+                self.H.append(self._compute_Hessian(J))
 # for(int level = 0; level < m_pyramid_level; level++) {
 #     cv::Mat m_dxdy = ComputeImageGradient(mvm_ref_image_pyramid[level]);
 #     mvm_ref_DxDy.push_back(m_dxdy);
@@ -301,6 +327,12 @@ class Alignment(object):
 #     cv::Mat m_dxdy = ComputeImageGradient(mvm_ref_image_pyramid[level]);
 #     mvm_ref_DxDy.push_back(m_dxdy);
 # }
+            self.template_dxdy = list()
+            for lvl in range(self.num_pyramid_levels):
+                dxdy = _image_gradient(self.template_pyramid[lvl])
+                # print(f'Pyramid {lvl} shape tpl {self.template_pyramid[lvl].shape} vs dxdy {dxdy.shape}')
+                # imvis.imshow(self.template_pyramid[lvl], title=f'pyr {lvl}', wait_ms=-1)
+                self.template_dxdy.append(dxdy)
         else:
             raise NotImplementedError()
         
@@ -340,14 +372,85 @@ class Alignment(object):
                 if self.verbose:
                     self._show_progress(self.full_reference_image, H)
         return H, curr_error
+    
+
+    def _helper_process_ic(self, tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level):
+        prev_error = -1
+        curr_error = -1
+        H = tmp_H.copy()
+        for iteration in range(self.max_iterations):
+            cur_working_image = self._warp_current_image(curr_image_pyramid, H)
+            # imvis.imshow(cur_working_image, "warped current image", wait_ms=-1)
+            residuals, curr_error = self._compute_residuals(cur_working_image, ref_image_pyramid)
+            print(f'Iteration[{iteration:3d}] Level[{pyramid_level}]: {curr_error:.6f}')
+            update_params = self._compute_update_params(self.H[pyramid_level], self.J[pyramid_level], residuals)
+            H_update = self._update_warp(update_params, H)
+
+            if prev_error < 0:
+                # Decide whether iterative update should be done in this pyramid level or not
+                cur_working_image = self._warp_current_image(curr_image_pyramid, H_update)
+                prev_error = curr_error
+                residuals, curr_error = self._compute_residuals(cur_working_image, ref_image_pyramid)
+                if self._is_converged(curr_error, prev_error):
+                    break
+                else:
+                    H = H_update.copy()
+                    if self.verbose:
+                        self._show_progress(self.full_reference_image, H)
+                    continue            
+            if self._is_converged(curr_error, prev_error):
+                break
+            else:
+                prev_error = curr_error
+                H = H_update.copy()
+                if self.verbose:
+                    self._show_progress(self.full_reference_image, H)
+        return H, curr_error
+
+    def _helper_process_esm(self, tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level):
+        prev_error = -1
+        curr_error = -1
+        H = tmp_H.copy()
+        for iteration in range(self.max_iterations):
+            cur_working_image = self._warp_current_image(curr_image_pyramid, H)
+            # imvis.imshow(cur_working_image, "warped current image", wait_ms=-1)
+            residuals, curr_error = self._compute_residuals(cur_working_image, ref_image_pyramid)
+            print(f'Iteration[{iteration:3d}] Level[{pyramid_level}]: {curr_error:.6f}')
+            dxdy = _image_gradient(cur_working_image)
+            J = self._compute_Jacobian(dxdy, self.template_dxdy[pyramid_level]) # JiJwJg
+            hessian = self._compute_Hessian(J)
+            update_params = self._compute_update_params(hessian, J, residuals)
+            H_update = self._update_warp(update_params, H)
+
+            if prev_error < 0:
+                # Decide whether iterative update should be done in this pyramid level or not
+                cur_working_image = self._warp_current_image(curr_image_pyramid, H_update)
+                prev_error = curr_error
+                residuals, curr_error = self._compute_residuals(cur_working_image, ref_image_pyramid)
+                if self._is_converged(curr_error, prev_error):
+                    break
+                else:
+                    H = H_update.copy()
+                    if self.verbose:
+                        self._show_progress(self.full_reference_image, H)
+                    continue            
+            if self._is_converged(curr_error, prev_error):
+                break
+            else:
+                prev_error = curr_error
+                H = H_update.copy()
+                if self.verbose:
+                    self._show_progress(self.full_reference_image, H)
+        return H, curr_error
+
 
     def _process_in_layer(self, tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level):
         if self.method == Method.FC:
             H, error = self._helper_process_fc(tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level)
         elif self.method == Method.IC:
-            raise NotImplementedError('TODO')
+            H, error = self._helper_process_ic(tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level)
         elif self.method == Method.ESM:
-            raise NotImplementedError('TODO')
+            H, error = self._helper_process_esm(tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level)
         else:
             raise NotImplementedError()
         print(f'Method {self.method}, final residual: {error}')
@@ -441,7 +544,7 @@ def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
     return warped, H
 
 
-def demo():
+def demo(method, num_pyramid_levels):
     img = imutils.imread('lenna.png')
     rect = (210, 210, 160, 160) # TODO check with non-square rect
     target_template = imutils.roi(img, rect)
@@ -461,7 +564,7 @@ def demo():
     print('H0\n', H0)
     print('H_gt\n', H_gt)
 
-    align = Alignment(target_template, Method.FC, full_reference_image=img, num_pyramid_levels=5)
+    align = Alignment(target_template, method, full_reference_image=img, num_pyramid_levels=num_pyramid_levels)
     align.set_true_warp(H_gt)
     H_est, result = align.track(warped, H0)
     imvis.imshow(result, 'Result', wait_ms=-1)
@@ -481,4 +584,8 @@ if __name__ == '__main__':
     # pu.toc('np')
     # assert np.array_equal(z1, z2)
     logging.basicConfig(level=logging.INFO)
-    demo()
+    demo(Method.FC, 5)# geht +1
+    demo(Method.IC, 4) # geht nicht (auch nicht cpp)
+    demo(Method.ESM, 6) #super fast
+    
+    
