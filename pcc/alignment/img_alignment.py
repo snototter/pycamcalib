@@ -280,7 +280,7 @@ class Alignment(object):
     def _is_converged(self, curr_error, prev_error):
         if prev_error < 0:
             return False
-        if abs(prev_error - curr_error) < 1e-6:#prev_error < curr_error + 1e-6: #0.0000001: # TODO check numerical stability
+        if abs(prev_error - curr_error) < 1e-5:#prev_error < curr_error + 1e-6: #0.0000001: # TODO check numerical stability
             return True
         return False
 
@@ -411,7 +411,7 @@ class Alignment(object):
         return H, curr_error
 
     def _process_in_layer(self, tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level):
-        # pu.tic('proc-layer')
+        pu.tic('proc-layer')
         if self.method == Method.FC:
             H, error = self._helper_process_fc(tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level)
         elif self.method == Method.IC:
@@ -420,7 +420,7 @@ class Alignment(object):
             H, error = self._helper_process_esm(tmp_H, curr_image_pyramid, ref_image_pyramid, pyramid_level)
         else:
             raise NotImplementedError()
-        # pu.toc('proc-layer')
+        pu.toc('proc-layer')
         _logger.info(f'{self.method}, final residual on pyramid level [{pyramid_level}]: {error}')
         return H
 
