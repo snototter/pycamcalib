@@ -1,14 +1,14 @@
 import logging
 import io
 import svgwrite
-import cv2
 import numpy as np
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 from dataclasses import dataclass, field
-from vito import imutils, imvis
-from collections import deque
+from vito import imutils
+# from collections import deque
 # from ..common import GridIndex, Rect, Point, sort_points_ccw, center, SpecificationError
+from ..export import svgwrite2image
 
 @dataclass
 class BoardSpecificationDAI(object):
@@ -88,7 +88,7 @@ num_squares_horizontal, num_squares_vertical: TODO
         #TODO remove dummy overlay (to indicate margins)
         dwg.add(dwg.rect(insert=(_mm(self.margin_horizontal_mm), _mm(self.margin_vertical_mm)),
                          size=(_mm(self.board_width_mm - 2*self.margin_horizontal_mm), _mm(self.board_height_mm - 2*self.margin_vertical_mm)),
-                         fill='blue'))
+                         fill='rgb(180,180,180)'))
 
         # Draw checkerboard (TODO first & last were clipped, iirc)
         cb = dwg.add(dwg.g(id='checkerboard'))
@@ -121,30 +121,20 @@ num_squares_horizontal, num_squares_vertical: TODO
             top += height
         return dwg
 
-    def export_svg(self, filename):
-        dwg = self.svg()
-        dwg.saveas(filename, pretty=True)
+    def image(self) -> np.ndarray:
+        """Renders the calibration pattern to an image (NumPy ndarray)."""
+        return svgwrite2image(self.svg())
 
-    def image(self):
-        """Renders the calibration pattern to an image (NumPy ndarray),
-        performing all actions in-memory."""
-        # Load the rendered SVG into a StringIO
-        svg_sio = io.StringIO(self.svg().tostring())
-        # Render it to PNG in-memory
-        dwg_input = svg2rlg(svg_sio)
-        img_mem_file = io.BytesIO()
-        renderPM.drawToFile(dwg_input, img_mem_file, fmt="PNG")  # NEVER EVER SET DPI! doesn't scale properly as of 2021-09
-        return imutils.memory_file2ndarray(img_mem_file)
 
 
 if __name__ == '__main__':
-    board = BoardSpecificationDAI('dai-5x9', board_width_mm=300, board_height_mm=200,#FIXME 1100//2,
-                                  margin_horizontal_mm=100//2, margin_vertical_mm=100//2,
-                                  checkerboard_square_length_mm=100//2)
+    board = BoardSpecificationDAI('dai-5x9', board_width_mm=160, board_height_mm=200,
+                                  margin_horizontal_mm=20, margin_vertical_mm=20,
+                                  checkerboard_square_length_mm=40)
     from vito import imvis
 
     imvis.imshow(board.image(), title='Calibration Board', wait_ms=-1)
 
-    # from .. import export_board
-    # export_board(board, 'dai-test')
+    from .. import export_board
+    export_board(board, 'dai-test')
     

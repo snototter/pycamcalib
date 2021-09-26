@@ -4,11 +4,22 @@ import io
 import svgwrite
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPDF, renderPM
-from vito import pyutils
+from vito import pyutils, imutils
 
 
-def _export_svgwrite_drawing(dwg: svgwrite.Drawing, filename: str):
+def export_svgwrite_drawing(dwg: svgwrite.Drawing, filename: str):
     dwg.saveas(filename, pretty=True)
+
+
+def svgwrite2image(dwg: svgwrite.Drawing):
+    """Converts the given SVG drawing to an in-memory image file (NumPy ndarray)."""
+    # Load the rendered SVG into a StringIO
+    svg_sio = io.StringIO(dwg.tostring())
+    # Render it to PNG in-memory
+    dwg_input = svg2rlg(svg_sio)
+    img_mem_file = io.BytesIO()
+    renderPM.drawToFile(dwg_input, img_mem_file, fmt="PNG")  # NEVER EVER SET DPI! doesn't scale properly as of 2021-09
+    return imutils.memory_file2ndarray(img_mem_file)
 
 
 def export_board(board_specification, output_basename: str=None, output_folder: str='.',
@@ -61,7 +72,7 @@ def export_board(board_specification, output_basename: str=None, output_folder: 
 
     if export_svg:
         logging.info(f'Exporting {board_specification.name} to {fn_svg}')
-        _export_svgwrite_drawing(svg_dwg, fn_svg)
+        export_svgwrite_drawing(svg_dwg, fn_svg)
 
     if export_pdf or export_png:
         # Parse svgwrite.Drawing into svglib

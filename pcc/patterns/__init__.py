@@ -1,5 +1,5 @@
 # Import common utils and export functionality for convenience
-from .common import *
+from .common import SpecificationError
 from .export import export_board
 
 # Import specific patterns only as a submodule
