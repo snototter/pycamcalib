@@ -1,11 +1,11 @@
-from .specification import DAIBoardSpecification
+from .specification import ClippedCheckerboardSpecification
 import cv2
 import numpy as np
 from vito import imutils
 
 
-class DAIDetector(object):
-    def __init__(self, board_specification: DAIBoardSpecification):
+class ClippedCheckerboardDetector(object):
+    def __init__(self, board_specification: ClippedCheckerboardSpecification):
         self.board_spec = board_specification
         # Number of inner corners
         self.nrows = self.board_spec.num_squares_vertical # TODO, currently the board adds clipped corners, thus we don't need - 1

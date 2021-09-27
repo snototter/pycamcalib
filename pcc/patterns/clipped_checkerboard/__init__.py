@@ -1,0 +1,3 @@
+
+from .specification import ClippedCheckerboardSpecification
+from .detection import ClippedCheckerboardDetector

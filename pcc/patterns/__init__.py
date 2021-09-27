@@ -14,4 +14,5 @@ from .export import export_board
 
 # Import specific patterns only as a submodule
 from . import eddie
-from . import dai
+from . import checkerboard
+from . import clipped_checkerboard
