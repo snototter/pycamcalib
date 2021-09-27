@@ -1,6 +1,7 @@
 import logging
 import os
 import io
+import numpy as np
 import svgwrite
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPDF, renderPM
@@ -11,7 +12,7 @@ def export_svgwrite_drawing(dwg: svgwrite.Drawing, filename: str):
     dwg.saveas(filename, pretty=True)
 
 
-def svgwrite2image(dwg: svgwrite.Drawing):
+def svgwrite2image(dwg: svgwrite.Drawing) -> np.ndarray:
     """Converts the given SVG drawing to an in-memory image file (NumPy ndarray)."""
     # Load the rendered SVG into a StringIO
     svg_sio = io.StringIO(dwg.tostring())

@@ -1,25 +1,34 @@
-from .specification import BoardSpecificationDAI
+from .specification import DAIBoardSpecification
 import cv2
 import numpy as np
 from vito import imutils
 
 
-class DetectorDAI(object):
-    def __init__(self, board_specification: BoardSpecificationDAI):
+class DAIDetector(object):
+    def __init__(self, board_specification: DAIBoardSpecification):
         self.board_spec = board_specification
+        # Number of inner corners
+        self.nrows = self.board_spec.num_squares_vertical # TODO, currently the board adds clipped corners, thus we don't need - 1
+        self.ncols = self.board_spec.num_squares_horizontal
+        self.reference_points = np.zeros((1, self.nrows * self.ncols, 3), np.float32)
+        self.reference_points[0, :, :2] = np.mgrid[0:self.nrows, 0:self.ncols].T.reshape(-1, 2)
 
     def process(self, image: np.ndarray):
+        image_points = None
+        object_points = None
         gray = imutils.grayscale(image)
-        ret, corners = cv2.findChessboardCorners(gray, (self.board_spec.num_squares_vertical, self.board_spec.num_squares_horizontal), None)
-        cv2.drawChessboardCorners(image, (self.board_spec.num_squares_vertical, self.board_spec.num_squares_horizontal), corners, True)
-        from vito import imvis
-        imvis.imshow(image, wait_ms=-1)
-        # criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-        # corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-
-if __name__ == '__main__':
-    board = BoardSpecificationDAI('dai-5x9', board_width_mm=300, board_height_mm=200,#FIXME 1100//2,
-                                  margin_horizontal_mm=100//2, margin_vertical_mm=100//2,
-                                  checkerboard_square_length_mm=100//2)
-    det = DetectorDAI(board)
-    
+        flags = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE
+        ret, corners = cv2.findChessboardCorners(gray, (self.nrows, self.ncols), flags)
+        # If the full checkerboard has been detected, refine corners and store correspondences
+        if ret:
+            object_points = self.reference_points
+            criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+            win_size = (5, 5)
+            zero_zone = (-1, -1)
+            corners = cv2.cornerSubPix(gray, corners, win_size, zero_zone, criteria)
+            image_points = corners
+            #TODO remove
+            cv2.drawChessboardCorners(image, (self.nrows, self.ncols), corners, ret)
+            from vito import imvis
+            imvis.imshow(image, wait_ms=-1)
+        return image_points, object_points

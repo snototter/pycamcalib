@@ -11,7 +11,7 @@ from vito import imutils
 from ..export import svgwrite2image
 
 @dataclass
-class BoardSpecificationDAI(object):
+class DAIBoardSpecification(object):
     """This class encapsulates the parameters of a checkerboard calibration
 board. As all 'board specification' classes, it provides functionality to
 render this board as SVG or PNG. To locate this board in images, refer to
@@ -124,17 +124,3 @@ num_squares_horizontal, num_squares_vertical: TODO
     def image(self) -> np.ndarray:
         """Renders the calibration pattern to an image (NumPy ndarray)."""
         return svgwrite2image(self.svg())
-
-
-
-if __name__ == '__main__':
-    board = BoardSpecificationDAI('dai-5x9', board_width_mm=160, board_height_mm=200,
-                                  margin_horizontal_mm=20, margin_vertical_mm=20,
-                                  checkerboard_square_length_mm=40)
-    from vito import imvis
-
-    imvis.imshow(board.image(), title='Calibration Board', wait_ms=-1)
-
-    from .. import export_board
-    export_board(board, 'dai-test')
-    
