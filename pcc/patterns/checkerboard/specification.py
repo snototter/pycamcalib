@@ -43,7 +43,11 @@ overlay_board_specifications: Flag to enable/disable overlay of the board
 
 
 *** Computed Parameters ***
-margin_horizontal_mm, margin_vertical_mm: 
+margin_horizontal_mm, margin_vertical_mm: Margins between checkerboard pattern
+        and the board's edge.
+
+reference_points: Object points in 3d to be used as reference/correspondences
+        for calibration.
     """
     
     name: str
@@ -60,6 +64,7 @@ margin_horizontal_mm, margin_vertical_mm:
 
     margin_horizontal_mm: int = field(init=False)
     margin_vertical_mm: int = field(init=False)
+    reference_points: np.ndarray = field(init=False)
 
     def __post_init__(self):
         """Derives uninitialized attributes and performs sanity checks."""
@@ -70,6 +75,11 @@ margin_horizontal_mm, margin_vertical_mm:
             raise SpecificationError('Horizontal margin < 0 (too many squares per row).')
         if self.margin_vertical_mm < 0:
             raise SpecificationError('Vertical margin < 0 (too many squares per column).')
+        # Set 3d object points (only consider INNER corners)
+        inner_rows = self.num_squares_vertical - 1
+        inner_cols = self.num_squares_horizontal - 1
+        self.reference_points = np.zeros((inner_cols * inner_rows, 3), np.float32)
+        self.reference_points[:, :2] = np.mgrid[0:inner_cols, 0:inner_rows].T.reshape(-1, 2) * self.checkerboard_square_length_mm
 
     def __repr__(self) -> str:
         return f'[pcc] Checkerboard: {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} a {self.checkerboard_square_length_mm}mm'

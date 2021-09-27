@@ -10,8 +10,8 @@ class CheckerboardDetector(object):
         # Number of inner corners
         self.nrows = self.board_spec.num_squares_vertical - 1
         self.ncols = self.board_spec.num_squares_horizontal - 1
-        self.reference_points = np.zeros((1, self.nrows * self.ncols, 3), np.float32)
-        self.reference_points[0, :, :2] = np.mgrid[0:self.nrows, 0:self.ncols].T.reshape(-1, 2)
+        # self.reference_points = np.zeros((1, self.nrows * self.ncols, 3), np.float32)
+        # self.reference_points[0, :, :2] = np.mgrid[0:self.nrows, 0:self.ncols].T.reshape(-1, 2)
 
     def process(self, image: np.ndarray):
         image_points = None
@@ -21,7 +21,7 @@ class CheckerboardDetector(object):
         ret, corners = cv2.findChessboardCorners(gray, (self.nrows, self.ncols), flags)
         # If the full checkerboard has been detected, refine corners and store correspondences
         if ret:
-            object_points = self.reference_points
+            object_points = self.board_spec.reference_points
             criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
             win_size = (5, 5)
             zero_zone = (-1, -1)
