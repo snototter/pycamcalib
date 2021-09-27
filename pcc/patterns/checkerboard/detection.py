@@ -28,8 +28,12 @@ class CheckerboardDetector(object):
             corners = cv2.cornerSubPix(gray, corners, win_size, zero_zone, criteria)
             image_points = corners
             #TODO remove
-            cv2.drawChessboardCorners(image, (self.nrows, self.ncols), corners, ret)
+            vis = image.copy()
+            cv2.drawChessboardCorners(vis, (self.nrows, self.ncols), corners, ret)
+            dst_sz = (800, 600) if vis.shape[1] > vis.shape[0] else (600, 800)
+            vis = cv2.resize(vis, dst_sz)
             from vito import imvis
-            imvis.imshow(image, wait_ms=-1)
+            imvis.imshow(vis, wait_ms=100)
+            #TODO end remove
         return image_points, object_points
     

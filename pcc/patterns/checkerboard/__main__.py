@@ -1,3 +1,4 @@
+from PIL.Image import Image
 from . import CheckerboardSpecification
 from . import CheckerboardDetector
 
@@ -16,8 +17,20 @@ if __name__ == '__main__':
     # export_board(board)
 
     detector = CheckerboardDetector(board)
-    image = imutils.imread('cb-10x6-example-rotated.jpg')
-    image_points, object_points = detector.process(image)
-    print(image_points.shape, object_points.shape)  
-    print(image_points.dtype, object_points.dtype)  
+    # image = imutils.imread('cb-10x6-example.jpg')
+    # image_points, object_points = detector.process(image)
+    # print(image_points.shape, object_points.shape)  
+    # print(image_points.dtype, object_points.dtype)  
     #TODO assert dtype float32, and shape img pt: Nx1x2, pattern: 1xNx3
+
+    print(board)
+
+    from vito import pyutils
+    from ..imgdir import ImageDirectorySource
+    import os
+    src = ImageDirectorySource('cb-example')
+    while src.is_available():
+        image = src.next()
+        pyutils.tic('Checkerboard Detection')
+        image_points, object_points = detector.process(image)
+        pyutils.toc('Checkerboard Detection')

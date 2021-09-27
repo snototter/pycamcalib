@@ -8,8 +8,11 @@ from reportlab.graphics import renderPM
 from dataclasses import dataclass, field
 from vito import imutils
 from ..export import svgwrite2image
+from ..common import paper_format_str
 # from collections import deque
 # from ..common import GridIndex, Rect, Point, sort_points_ccw, center, SpecificationError
+
+_logger = logging.getLogger('Checkerboard')
 
 @dataclass
 class CheckerboardSpecification(object):
@@ -34,6 +37,10 @@ color_background, color_foreground: SVG color used to fill the background, speci
         * hex color string: #ff9e2c
         * rgb color string: rgb(255, 128, 44)
 
+overlay_board_specifications: Flag to enable/disable overlay of the board
+        specification. If enabled, the parametrization will be printed within
+        the board's bottom margin (if there is enough space).
+
 
 *** Computed Parameters ***
 margin_horizontal_mm, margin_vertical_mm: 
@@ -49,6 +56,8 @@ margin_horizontal_mm, margin_vertical_mm:
     color_background: str = 'white'
     color_foreground: str = 'black'
 
+    overlay_board_specifications: bool = True
+
     margin_horizontal_mm: int = field(init=False)
     margin_vertical_mm: int = field(init=False)
 
@@ -62,9 +71,12 @@ margin_horizontal_mm, margin_vertical_mm:
         if self.margin_vertical_mm < 0:
             raise SpecificationError('Vertical margin < 0 (too many squares per column).')
 
+    def __repr__(self) -> str:
+        return f'[pcc] Checkerboard: {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} a {self.checkerboard_square_length_mm}mm'
+
     def svg(self) -> svgwrite.Drawing:
         """Returns the SVG drawing of this calibration board."""
-        logging.info(f'Drawing calibration pattern: {self.name}')
+        _logger.info(f'Drawing calibration pattern: {self.name}')
         
         # Helper to put fully-specified coordinates (in millimeters)
         def _mm(v):
@@ -92,6 +104,24 @@ margin_horizontal_mm, margin_vertical_mm:
                 cb.add(dwg.rect(insert=(_mm(left), _mm(top)),
                                 size=(_mm(self.checkerboard_square_length_mm), _mm(self.checkerboard_square_length_mm)),
                                 class_="pattern"))
+        
+        # Overlay pattern information
+        if self.overlay_board_specifications:
+            font_size_mm = 4
+            line_padding_mm = 1
+            text_height_mm = 2 * (font_size_mm + line_padding_mm)
+            overlay_color = 'rgb(120, 120, 120)'
+            if self.margin_vertical_mm < text_height_mm:
+                _logger.warning(f'Cannot overlay specification. Bottom margin {self.margin_vertical_mm}mm is too small (requiring a min. of {text_height_mm} mm).')
+            else:
+                top = min(self.board_height_mm - self.margin_vertical_mm / 4, self.board_height_mm - text_height_mm)
+                overlay = dwg.g(style=f"font-size:{_mm(font_size_mm)};font-family:monospace;stroke:{overlay_color};stroke-width:1;fill:{overlay_color};")
+                overlay.add(dwg.text('pcc::Checkerboard', insert=(_mm(self.margin_horizontal_mm / 4), _mm(top))))
+                top += font_size_mm + line_padding_mm
+                overlay.add(dwg.text(f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm',
+                                     insert=(_mm(self.margin_horizontal_mm / 4), _mm(top))))
+                dwg.add(overlay)
+
         return dwg
 
     def image(self) -> np.ndarray:

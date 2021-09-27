@@ -206,3 +206,35 @@ def bottommost_point(pt_list):
         if pt_list[idx].y < pt_list[bm_idx].y:
             bm_idx = idx
     return pt_list[bm_idx]
+
+
+def fully_qualified_classname(obj):
+    """
+    Returns the fully qualified class name of the given object.
+    Adapted from https://stackoverflow.com/a/2020083
+    """
+    c = obj.__class__
+    m = c.__module__
+    if m == 'builtins':  # Avoid returning "builtins.str"
+        return c.__qualname__
+    return m + '.' + c.__qualname__
+
+
+def paper_format_str(width_mm, height_mm):
+    """
+    Returns the paper format corresponding to the given paper dimensions.
+    If the size is not mapped to a format, a string representation 'Wmm x Hmm'
+    will be returned instead.
+    """
+    formats = {
+        (841, 1189): 'A0',  # German: "Vierfachbogen"
+        (594, 841): 'A1',  # "Doppelbogen"
+        (420, 594): 'A2',  # "Bogen"
+        (297, 420): 'A3',  # "Halbbogen"
+        (210, 297): 'A4',  # "Viertelbogen"
+        (148, 210): 'A5'  # "Blatt/Achtelbogen"
+    }
+    key = (width_mm, height_mm)
+    if key in formats:
+        return formats[key]
+    return f'{width_mm}mm x {height_mm}mm'
