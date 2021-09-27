@@ -17,15 +17,19 @@ _logger = logging.getLogger('ClippedCheckerboard')
 class ClippedCheckerboardSpecification(object):
     """This class encapsulates the parameters of a clipped checkerboard
 calibration board, where the first & last rows/columns contain clipped
-cells. Thus, given an NxM specification, the board will have (N-1) full
-squares along each row, with a leading and trailing "half square":
-  -------------
+"squares". Thus, if you specify N squares per row, the board will have (N-1)
+full squares along each row, with a leading and trailing "half square". For
+example, with num_squares_horizontal = 5 the board would look like:
+  _____________
+  |
   |  xx  xx  x
   | x  xx  xx
   | x  xx  xx
   |  xx  xx  x
   |  xx  xx  x
        ... 
+With this board type, the print margin is automatically given as half
+the square length.
 
 *** Adjustable Parameters ***
 name:   Identifier of this calibration pattern
@@ -141,7 +145,6 @@ board_width_mm, board_height_mm: Dimensions of the physical board in [mm]
                     top += font_size_mm + line_padding_mm
                     overlay.add(dwg.text(f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm',
                                         insert=(_mm(square_length_half_mm / 2), _mm(top))))
-                # dwg.add(overlay)
         return dwg
 
     def image(self) -> np.ndarray:
