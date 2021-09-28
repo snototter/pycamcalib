@@ -1,18 +1,14 @@
 import logging
-import io
 from pcc.patterns.common import SpecificationError
 import svgwrite
 import numpy as np
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPM
 from dataclasses import dataclass, field
-from vito import imutils
 from ..svgutils import svgwrite2image, overlay_pattern_specification
 from ..common import paper_format_str
-# from collections import deque
-# from ..common import GridIndex, Rect, Point, sort_points_ccw, center, SpecificationError
+
 
 _logger = logging.getLogger('Checkerboard')
+
 
 @dataclass
 class CheckerboardSpecification(object):
@@ -31,8 +27,8 @@ checkerboard_square_length_mm: side length of a checkerboard square in [mm]
 
 num_squares_horizontal, num_squares_vertical: Number of squares along the
         corresponding dimension
-    
-color_background, color_foreground: SVG color used to fill the background, specify via:
+
+color_background, color_foreground, color_overlay: SVG color, specify as either
         * named colors: white, red, orange, ...
         * hex color string: #ff9e2c
         * rgb color string: rgb(255, 128, 44)
@@ -49,16 +45,17 @@ margin_horizontal_mm, margin_vertical_mm: Margins between checkerboard pattern
 reference_points: Object points in 3d to be used as reference/correspondences
         for calibration.
 """
-    
+
     name: str
     board_width_mm: int
     board_height_mm: int
     checkerboard_square_length_mm: int
     num_squares_horizontal: int
     num_squares_vertical: int
-    
+
     color_background: str = 'white'
     color_foreground: str = 'black'
+    color_overlay: str = 'rgb(120, 120, 120)'
 
     overlay_board_specifications: bool = True
 
@@ -76,14 +73,15 @@ reference_points: Object points in 3d to be used as reference/correspondences
         if self.margin_vertical_mm < 0:
             raise SpecificationError('Vertical margin < 0 (too many squares per column).')
         # Set 3d object points (only consider INNER corners)
-        #FIXME check order of points
         self.reference_points = np.zeros((self.num_inner_corners_horizontal * self.num_inner_corners_vertical, 3), np.float32)
-        self.reference_points[:, :2] = np.mgrid[0:self.num_inner_corners_horizontal, 0:self.num_inner_corners_vertical].T.reshape(-1, 2) * self.checkerboard_square_length_mm
+        v, u = np.meshgrid(np.arange(self.num_inner_corners_vertical), np.arange(self.num_inner_corners_horizontal))
+        self.reference_points[:, 0] = u.flatten() * self.checkerboard_square_length_mm
+        self.reference_points[:, 1] = v.flatten() * self.checkerboard_square_length_mm
 
     @property
     def num_inner_corners_horizontal(self):
         return self.num_squares_horizontal - 1
-    
+
     @property
     def num_inner_corners_vertical(self):
         return self.num_squares_vertical - 1
@@ -91,7 +89,7 @@ reference_points: Object points in 3d to be used as reference/correspondences
     def svg(self) -> svgwrite.Drawing:
         """Returns the SVG drawing of this calibration board."""
         _logger.info(f'Drawing calibration pattern: {self.name}')
-        
+
         # Helper to put fully-specified coordinates (in millimeters)
         def _mm(v):
             return f'{v}mm'
@@ -125,7 +123,8 @@ reference_points: Object points in 3d to be used as reference/correspondences
             overlay_pattern_specification(dwg, 'pcc::Checkerboard', fmt_str,
                                           board_height_mm=self.board_height_mm,
                                           available_space_mm=self.margin_vertical_mm * 0.6,
-                                          offset_left_mm=self.margin_horizontal_mm / 2)
+                                          offset_left_mm=self.margin_horizontal_mm / 2,
+                                          color_overlay=self.color_overlay)
         return dwg
 
     def image(self) -> np.ndarray:

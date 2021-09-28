@@ -166,17 +166,23 @@ if __name__ == '__main__':
                                       board_width_mm=210, board_height_mm=297,
                                       checkerboard_square_length_mm=25,
                                       num_squares_horizontal=6, num_squares_vertical=10)
-    #TODO export demo
-    from .. import export_board
-    export_board(board, prevent_overwrite=False)
-    assert False
+    
+    # from .. import export_board
+    # export_board(board, prevent_overwrite=False)
+    # assert False
 
     detector = CheckerboardDetector(board)
+    image_points, object_points = detector.process(board.image())
+    print('img points', image_points.shape)
+    print('ref points', object_points.shape)
+    print('img', image_points[:12,0,:])
+    print('obj', object_points[:12, :])
+    imvis.imshow(board.image(), title='board', wait_ms=-1)
+    assert False
 
     from vito import pyutils
     from ..imgdir import ImageDirectorySource
-    import os
-    src = ImageDirectorySource('cb-example')
+    src = ImageDirectorySource('example-ccb')
     image_points = list()
     object_points = list()
     img_shape = None
