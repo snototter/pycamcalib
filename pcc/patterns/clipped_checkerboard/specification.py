@@ -121,6 +121,7 @@ board_width_mm, board_height_mm: Dimensions of the physical board in [mm]
                                 class_="pattern"))
         
         # Overlay pattern information
+        #TODO move to common svg utils
         if self.overlay_board_specifications:
             font_size_mm = 4
             line_padding_mm = 1
