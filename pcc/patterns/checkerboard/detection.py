@@ -1,4 +1,3 @@
-from .specification import CheckerboardSpecification
 import cv2
 import numpy as np
 from vito import imutils

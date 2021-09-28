@@ -1,6 +1,6 @@
 from PIL.Image import Image
 from . import CheckerboardSpecification
-from . import CheckerboardDetector
+from . import CheckerboardDetector, ClippedCheckerboardSpecification
 from ..common import PAPER_DIMENSIONS
 import logging
 import cv2

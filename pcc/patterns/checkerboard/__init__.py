@@ -1,6 +1,7 @@
 """
-Default checkerboard calibration pattern.
+Checkerboard calibration pattern.
 See, e.g. https://docs.opencv.org/3.4.15/dc/dbb/tutorial_py_calibration.html
 """
-from .specification import CheckerboardSpecification
+from .specification_standard import CheckerboardSpecification
+from .specification_shifted import ClippedCheckerboardSpecification
 from .detection import CheckerboardDetector
