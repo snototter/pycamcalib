@@ -10,7 +10,7 @@ Each calibration pattern submodule consists of:
 """
 # Import common utils and export functionality for convenience
 from .common import SpecificationError
-from .export import export_board
+from .svgutils import export_board
 
 # Import specific patterns only as a submodule
 from . import eddie

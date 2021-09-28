@@ -87,3 +87,38 @@ def export_board(board_specification, output_basename: str=None, output_folder: 
             # perfectly)
             logging.info(f'Exporting {board_specification.name} to {fn_png}')
             renderPM.drawToFile(drawing, fn_png, fmt="PNG")
+
+
+def overlay_pattern_specification(dwg: svgwrite.Drawing, text_line1: str, text_line2: str,
+                                  board_height_mm: float, available_space_mm: float, offset_left_mm: float,
+                                  font_size_mm: int = 4, line_padding_mm: int = 1,
+                                  overlay_color: str = 'rgb(120, 120, 120)'):
+    """Overlays the pattern specification strings onto the SVG drawing.
+    Depending on the available free space at the bottom of the board this will:
+    * Place both text_line arguments below each other, or
+    * Concatenate the text_line arguments and place them as a single line, or
+    * Don't add any text and log a warning instead.
+    """
+    # Check if 2 lines fit within the available space. If not, we try only a single line of text:
+    text_height_mm = 2 * (font_size_mm + line_padding_mm)
+    single_line = text_height_mm > available_space_mm
+    if single_line:
+        text_height_mm = font_size_mm + line_padding_mm
+    
+    if available_space_mm < text_height_mm:
+        logging.warning(f'Cannot overlay specification. Available free space {available_space_mm}mm is too small (requiring at least {text_height_mm} mm).')
+    else:
+        def _mm(v):
+            return f'{v}mm'
+
+        top = min(board_height_mm - available_space_mm, board_height_mm - text_height_mm) + font_size_mm
+        overlay = dwg.add(dwg.g(style=f"font-size:{_mm(font_size_mm)};font-family:monospace;stroke:none;fill:{overlay_color};"))
+        if single_line:
+            overlay.add(dwg.text(f'{text_line1} {text_line2}',
+                                 insert=(_mm(offset_left_mm), _mm(top))))
+        else:
+            overlay.add(dwg.text(text_line1,
+                                 insert=(_mm(offset_left_mm), _mm(top))))
+            top += font_size_mm + line_padding_mm
+            overlay.add(dwg.text(text_line2,
+                                 insert=(_mm(offset_left_mm), _mm(top))))

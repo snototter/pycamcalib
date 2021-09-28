@@ -9,7 +9,7 @@ from vito import imutils
 # from collections import deque
 # from ..common import GridIndex, Rect, Point, sort_points_ccw, center, SpecificationError
 from ..common import paper_format_str
-from ..export import svgwrite2image
+from ..svgutils import svgwrite2image, overlay_pattern_specification
 
 _logger = logging.getLogger('ClippedCheckerboard')
 
@@ -51,6 +51,8 @@ overlay_board_specifications: Flag to enable/disable overlay of the board
 *** Computed Parameters ***
 ...
 board_width_mm, board_height_mm: Dimensions of the physical board in [mm]
+
+#TODO distances can also be larger (and differ across edges!)
 """
     
     name: str
@@ -65,7 +67,7 @@ board_width_mm, board_height_mm: Dimensions of the physical board in [mm]
 
     board_width_mm: int = field(init=False)
     board_height_mm: int = field(init=False)
-    reference_points: np.ndarray = field(init=False)
+    reference_points: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self):
         """Derives remaining attributes after user intialization."""
@@ -73,12 +75,12 @@ board_width_mm, board_height_mm: Dimensions of the physical board in [mm]
         self.board_height_mm = (self.num_squares_vertical + 1) * self.checkerboard_square_length_mm
         #TODO ref points
     
-    def __repr__(self) -> str:
-        return f'[pcc] ClippedCheckerboard: {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} a {self.checkerboard_square_length_mm}mm'
+    # def __repr__(self) -> str:
+    #     return f'[pcc] ClippedCheckerboard: {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} a {self.checkerboard_square_length_mm}mm'
 
     def svg(self) -> svgwrite.Drawing:
         """Returns the SVG drawing of this calibration board."""
-        _logger.info(f'Drawing calibration pattern: {self}')
+        _logger.info(f'Drawing calibration pattern: {self.name}')
         
         # Helper to put fully-specified coordinates (in millimeters)
         def _mm(v):
@@ -91,7 +93,7 @@ board_width_mm, board_height_mm: Dimensions of the physical board in [mm]
         dwg.attribs['height'] = _mm(self.board_height_mm)
         dwg.attribs['width'] = _mm(self.board_width_mm)
 
-        dwg.defs.add(dwg.style(f".pattern {{ stroke: {self.color_foreground}; stroke-width:1px; }}"))
+        dwg.defs.add(dwg.style(f".pattern {{ fill: {self.color_foreground}; stroke: none; }}"))
 
         # Background should not be transparent
         dwg.add(dwg.rect(insert=(0, 0), size=(_mm(self.board_width_mm), _mm(self.board_height_mm)), fill=self.color_background))
@@ -121,31 +123,12 @@ board_width_mm, board_height_mm: Dimensions of the physical board in [mm]
                                 class_="pattern"))
         
         # Overlay pattern information
-        #TODO move to common svg utils
         if self.overlay_board_specifications:
-            font_size_mm = 4
-            line_padding_mm = 1
-            text_height_mm = 2 * (font_size_mm + line_padding_mm)
-            overlay_color = 'rgb(120, 120, 120)'
-            available_space = square_length_half_mm * 0.6
-            # If we don't have enough space, try adding only a single line of text:
-            single_line = text_height_mm > available_space
-            if single_line:
-                text_height_mm = font_size_mm + line_padding_mm
-            
-            if available_space < text_height_mm:
-                _logger.warning(f'Cannot overlay specification. Available free space {available_space}mm is too small (requiring at least {text_height_mm} mm).')
-            else:
-                top = min(self.board_height_mm - available_space, self.board_height_mm - text_height_mm) + font_size_mm
-                overlay = dwg.add(dwg.g(style=f"font-size:{_mm(font_size_mm)};font-family:monospace;stroke:{overlay_color};stroke-width:1;fill:{overlay_color};"))
-                if single_line:
-                    overlay.add(dwg.text(f'pcc::ClippedCheckerboard {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm',
-                                         insert=(_mm(square_length_half_mm / 2), _mm(top))))
-                else:
-                    overlay.add(dwg.text('pcc::ClippedCheckerboard', insert=(_mm(square_length_half_mm / 2), _mm(top))))
-                    top += font_size_mm + line_padding_mm
-                    overlay.add(dwg.text(f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm',
-                                        insert=(_mm(square_length_half_mm / 2), _mm(top))))
+            overlay_pattern_specification(dwg, 'pcc::ClippedCheckerboard',
+                                          f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm',
+                                          board_height_mm=self.board_height_mm,
+                                          available_space_mm=square_length_half_mm * 0.6,
+                                          offset_left_mm=square_length_half_mm/2)
         return dwg
 
     def image(self) -> np.ndarray:

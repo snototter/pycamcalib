@@ -7,7 +7,7 @@ from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 from dataclasses import dataclass, field
 from vito import imutils
-from ..export import svgwrite2image
+from ..svgutils import svgwrite2image #TODO overlay-board-specs
 from ..common import paper_format_str
 # from collections import deque
 # from ..common import GridIndex, Rect, Point, sort_points_ccw, center, SpecificationError
@@ -81,8 +81,8 @@ reference_points: Object points in 3d to be used as reference/correspondences
         self.reference_points = np.zeros((inner_cols * inner_rows, 3), np.float32)
         self.reference_points[:, :2] = np.mgrid[0:inner_cols, 0:inner_rows].T.reshape(-1, 2) * self.checkerboard_square_length_mm
 
-    def __repr__(self) -> str:
-        return f'[pcc] Checkerboard: {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} a {self.checkerboard_square_length_mm}mm'
+    # def __repr__(self) -> str:
+    #     return f'[pcc] Checkerboard: {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} a {self.checkerboard_square_length_mm}mm'
 
     def svg(self) -> svgwrite.Drawing:
         """Returns the SVG drawing of this calibration board."""
@@ -99,7 +99,7 @@ reference_points: Object points in 3d to be used as reference/correspondences
         dwg.attribs['height'] = _mm(self.board_height_mm)
         dwg.attribs['width'] = _mm(self.board_width_mm)
 
-        dwg.defs.add(dwg.style(f".pattern {{ stroke: {self.color_foreground}; stroke-width:1px; }}"))
+        dwg.defs.add(dwg.style(f".pattern {{ fill: {self.color_foreground}; stroke: none; }}"))
 
         # Background should not be transparent
         dwg.add(dwg.rect(insert=(0, 0), size=(_mm(self.board_width_mm), _mm(self.board_height_mm)), fill=self.color_background))
