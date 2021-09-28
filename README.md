@@ -20,15 +20,21 @@ Camera calibration UI
 * [ ] Use configurable template
   * [x] Render to SVG
   * [x] Render to PNG
-  * [ ] Refactoring (pattern_specs is quite cluttered & uses ambiguous names - e.g. "grid")
-* [x] Detect center marker
+  * [ ] Refactor eddie (pattern_specs is quite cluttered & uses ambiguous names - e.g. "grid")
+* [x] Detect eddie center marker
   * [x] Contour-based detection, estimate initial homography
   * [x] Support clipped center markers (near image borders)
   * [ ] Refactoring
-* [ ] Correspondence search
+* [ ] Correspondence search for eddie
   * [ ] Initial point correspondences
-  * [ ] Refine matches via ICA
+  * [ ] Refine matches via FCA/ICA
   * [ ] Refactoring
+* [ ] Extensions
+  * [x] Integrate standard checkerboard & clipped/shifted checkerboard
+  * [ ] Each pattern should provide config widget (import/export config JSON or TOML, export SVG/PNG/PDF)
+  * [ ] Rethink extensions (each pattern submodule could provide a "Specification" and "Detector") - `pcc.patterns` could iterate submodules and create a table of known patterns
+  * [ ] `pcc.patterns` should provide mechanism to register default patterns (e.g. A4 checkerboard, A0 something)
+  * [ ] Each detector should be able to `visualize(image, img_pts)`, compute and visualize coverage (convex hull over list of img_pts)
 * [ ] UI
   * [ ] Image loading
   * [ ] Visualize marker & point matches 
@@ -39,3 +45,4 @@ Camera calibration UI
   * [ ] Parallelization
 * TODO Documentation
   * Conventions (`NxM` means number of squares, NOT internal corners)
+
