@@ -15,9 +15,13 @@ def _is_image_filename(f):
 class ImageDirectorySource(object):
     """Allows iterating all images of a local directory in sorted order."""
     def __init__(self, folder):
+        if not os.path.exists(folder):
+            raise FileNotFoundError(f"No such folder '{folder}'")
         self.folder = folder
         self.files = sorted([f for f in os.listdir(folder) if _is_image_filename(f)])
         self.idx = 0
+        if len(self.files) == 0:
+            raise FileNotFoundError(f"No image files in folder '{folder}'")
 
     def is_available(self) -> bool:
         return 0 <= self.idx < len(self.files)  # Python allows chained comparisons
