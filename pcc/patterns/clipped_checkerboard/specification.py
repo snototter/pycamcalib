@@ -1,17 +1,13 @@
 import logging
-import io
 import svgwrite
 import numpy as np
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPM
 from dataclasses import dataclass, field
-from vito import imutils
-# from collections import deque
-# from ..common import GridIndex, Rect, Point, sort_points_ccw, center, SpecificationError
 from ..common import paper_format_str, SpecificationError
 from ..svgutils import svgwrite2image, overlay_pattern_specification
 
+
 _logger = logging.getLogger('ClippedCheckerboard')
+
 
 @dataclass
 class ClippedCheckerboardSpecification(object):
@@ -27,7 +23,7 @@ example, with num_squares_horizontal = 5 the board would look like:
   | x  xx  xx
   |  xx  xx  x
   |  xx  xx  x
-       ... 
+       ...
 Consequently, this board will have N x M inner corners if N = number
 of squares per row and M = number of squares per column.
 
@@ -40,8 +36,8 @@ num_squares_horizontal, num_squares_vertical: Number of squares along the
         corresponding dimension
 
 checkerboard_square_length_mm: side length of a checkerboard square in [mm]
-    
-color_background, color_foreground: SVG color, specify via:
+
+color_background, color_foreground, color_overlay: SVG color, specify as either
         * named colors: white, red, orange, ...
         * hex color string: #ff9e2c
         * rgb color string: rgb(255, 128, 44)
@@ -57,16 +53,17 @@ margin_horizontal_mm, margin_vertical_mm: Distance from the edge of the physical
 
 TODO double-check doc before release
 """
-    
+
     name: str
     board_width_mm: int
     board_height_mm: int
     num_squares_horizontal: int
     num_squares_vertical: int
     checkerboard_square_length_mm: int
-    
+
     color_background: str = 'white'
     color_foreground: str = 'black'
+    color_overlay: str = 'rgb(120, 120, 120)'
 
     overlay_board_specifications: bool = True
 
@@ -76,9 +73,6 @@ TODO double-check doc before release
 
     def __post_init__(self):
         """Derives remaining attributes after user intialization."""
-        # self.board_width_mm = (self.num_squares_horizontal + 1) * self.checkerboard_square_length_mm
-        # self.board_height_mm = (self.num_squares_vertical + 1) * self.checkerboard_square_length_mm
-
         self.margin_horizontal_mm = (self.board_width_mm - self.num_squares_horizontal * self.checkerboard_square_length_mm) / 2
         self.margin_vertical_mm = (self.board_height_mm - self.num_squares_vertical * self.checkerboard_square_length_mm) / 2
         # Sanity checks
@@ -87,18 +81,15 @@ TODO double-check doc before release
         if self.margin_vertical_mm < 0:
             raise SpecificationError(f'Vertical margin {self.margin_vertical_mm} < 0 (too many squares per column). Check specification for {self}')
         # Set 3d object points (only consider INNER corners)
-        #FIXME check order of ref points
         self.reference_points = np.zeros((self.num_inner_corners_horizontal * self.num_inner_corners_vertical, 3), np.float32)
         v, u = np.meshgrid(np.arange(self.num_inner_corners_vertical), np.arange(self.num_inner_corners_horizontal))
         self.reference_points[:, 0] = u.flatten() * self.checkerboard_square_length_mm
         self.reference_points[:, 1] = v.flatten() * self.checkerboard_square_length_mm
-    
-    # def __repr__(self) -> str:
-    #     return f'[pcc] ClippedCheckerboard: {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} a {self.checkerboard_square_length_mm}mm'
+
     @property
     def num_inner_corners_horizontal(self):
         return self.num_squares_horizontal
-    
+
     @property
     def num_inner_corners_vertical(self):
         return self.num_squares_vertical
@@ -106,7 +97,7 @@ TODO double-check doc before release
     def svg(self) -> svgwrite.Drawing:
         """Returns the SVG drawing of this calibration board."""
         _logger.info(f'Drawing calibration pattern: {self.name}')
-        
+
         # Helper to put fully-specified coordinates (in millimeters)
         def _mm(v):
             return f'{v}mm'
@@ -127,32 +118,37 @@ TODO double-check doc before release
         for row in range(self.num_squares_vertical + 1):
             if row in [0, self.num_squares_vertical]:
                 # Top- and bottom-most rows contain "half squares"
-                top = self.margin_vertical_mm if row == 0 else (self.board_height_mm - self.margin_vertical_mm - square_length_half_mm)
+                top = self.margin_vertical_mm if row == 0 else\
+                      (self.board_height_mm - self.margin_vertical_mm - square_length_half_mm)
                 height = square_length_half_mm
             else:
                 # All other rows contain "full squares"
                 height = self.checkerboard_square_length_mm
-                top = self.margin_vertical_mm + square_length_half_mm + (row - 1) * self.checkerboard_square_length_mm
+                top = self.margin_vertical_mm + square_length_half_mm\
+                    + (row - 1) * self.checkerboard_square_length_mm
             for col in range((row + 1) % 2, self.num_squares_horizontal + 1, 2):
                 if col in [0, self.num_squares_horizontal]:
                     # Left- and right-most columns contain "half squares"
-                    left = self.margin_horizontal_mm if col == 0 else (self.board_width_mm - self.margin_horizontal_mm - square_length_half_mm)
+                    left = self.margin_horizontal_mm if col == 0 else\
+                           (self.board_width_mm - self.margin_horizontal_mm - square_length_half_mm)
                     width = square_length_half_mm
                 else:
                     # All other columns contain "full squares"
-                    left = self.margin_horizontal_mm + square_length_half_mm + (col - 1) * self.checkerboard_square_length_mm
+                    left = self.margin_horizontal_mm + square_length_half_mm\
+                         + (col - 1) * self.checkerboard_square_length_mm
                     width = self.checkerboard_square_length_mm
                 cb.add(dwg.rect(insert=(_mm(left), _mm(top)),
                                 size=(_mm(width), _mm(height)),
                                 class_="pattern"))
-        
+
         # Overlay pattern information
         if self.overlay_board_specifications:
             fmt_str = f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm, margins: {self.margin_horizontal_mm:.1f}mm x {self.margin_vertical_mm:.1f}mm'
             overlay_pattern_specification(dwg, 'pcc::ClippedCheckerboard', fmt_str,
                                           board_height_mm=self.board_height_mm,
                                           available_space_mm=self.margin_vertical_mm * 0.6,
-                                          offset_left_mm=square_length_half_mm/2)
+                                          offset_left_mm=square_length_half_mm/2,
+                                          color_overlay=self.color_overlay)
         return dwg
 
     def image(self) -> np.ndarray:
