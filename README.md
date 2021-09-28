@@ -31,7 +31,9 @@ Camera calibration UI
   * [ ] Refactoring
 * [ ] Extensions
   * [x] Integrate standard checkerboard & clipped/shifted checkerboard
+  * [ ] Preprocessing submodule (histeq, binarization fixed/adaptive, normalization, cutoff bi-ended-slider, ...)
   * [ ] Each pattern should provide config widget (import/export config JSON or TOML, export SVG/PNG/PDF)
+  * [ ] Each pattern should provide preconfigured calibration boards
   * [ ] Rethink extensions (each pattern submodule could provide a "Specification" and "Detector") - `pcc.patterns` could iterate submodules and create a table of known patterns
   * [ ] `pcc.patterns` should provide mechanism to register default patterns (e.g. A4 checkerboard, A0 something)
   * [ ] Each detector should be able to `visualize(image, img_pts)`, compute and visualize coverage (convex hull over list of img_pts)
