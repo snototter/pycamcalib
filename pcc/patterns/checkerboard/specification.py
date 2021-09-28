@@ -81,9 +81,6 @@ reference_points: Object points in 3d to be used as reference/correspondences
         self.reference_points = np.zeros((inner_cols * inner_rows, 3), np.float32)
         self.reference_points[:, :2] = np.mgrid[0:inner_cols, 0:inner_rows].T.reshape(-1, 2) * self.checkerboard_square_length_mm
 
-    # def __repr__(self) -> str:
-    #     return f'[pcc] Checkerboard: {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} a {self.checkerboard_square_length_mm}mm'
-
     def svg(self) -> svgwrite.Drawing:
         """Returns the SVG drawing of this calibration board."""
         _logger.info(f'Drawing calibration pattern: {self.name}')
@@ -92,13 +89,14 @@ reference_points: Object points in 3d to be used as reference/correspondences
         def _mm(v):
             return f'{v}mm'
 
-        dwg = svgwrite.Drawing(profile='full')
-        #, height=f'{h_target_mm}mm', width=f'{w_target_mm}mm', profile='tiny', debug=False)
-        # Height/width weren't set properly in the c'tor (my SVGs had 100% instead
-        # of the desired dimensions). Thus, we set the attributes manually:
+        dwg = svgwrite.Drawing(profile='full', height=_mm(self.board_height_mm), width=_mm(self.board_width_mm), debug=False)
+        # Height/width weren't set properly in the c'tor (all export tests had
+        # 100% height/width instead of the desired metric dimensions. Thus, we
+        # have to reset the attributes after construction:
         dwg.attribs['height'] = _mm(self.board_height_mm)
         dwg.attribs['width'] = _mm(self.board_width_mm)
 
+        # Define CSS styles
         dwg.defs.add(dwg.style(f".pattern {{ fill: {self.color_foreground}; stroke: none; }}"))
 
         # Background should not be transparent
@@ -108,19 +106,18 @@ reference_points: Object points in 3d to be used as reference/correspondences
         cb = dwg.add(dwg.g(id='checkerboard'))
         for row in range(self.num_squares_vertical):
             top = self.margin_vertical_mm + row * self.checkerboard_square_length_mm
-
             for col in range(row % 2, self.num_squares_horizontal, 2):  # Ensures alternating placement
                 left = self.margin_horizontal_mm + col * self.checkerboard_square_length_mm
                 cb.add(dwg.rect(insert=(_mm(left), _mm(top)),
                                 size=(_mm(self.checkerboard_square_length_mm), _mm(self.checkerboard_square_length_mm)),
                                 class_="pattern"))
-        
+
         # Overlay pattern information
         if self.overlay_board_specifications:
-            overlay_pattern_specification(dwg, 'pcc::Checkerboard',
-                                          f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm',
+            fmt_str = f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm'
+            overlay_pattern_specification(dwg, 'pcc::Checkerboard', fmt_str,
                                           board_height_mm=self.board_height_mm,
-                                          available_space_mm=self.margin_vertical_mm / 2,
+                                          available_space_mm=self.margin_vertical_mm * 0.6,
                                           offset_left_mm=self.margin_horizontal_mm / 2)
         return dwg
 
