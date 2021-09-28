@@ -16,6 +16,8 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from mpl_toolkits.mplot3d import Axes3D    # @UnusedImport
 from matplotlib.figure import Figure
 
+#TODO add https://stackoverflow.com/questions/22867620/putting-arrowheads-on-vectors-in-matplotlibs-3d-plot
+#TODO check also https://www.pythonguis.com/tutorials/plotting-matplotlib/
 
 # Auto-generated code from QT Designer ----------------------------------------
 
@@ -25,40 +27,43 @@ class Ui_MainWindow(object):
         MainWindow.resize(750, 497)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.centralwidget)
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.frame_2 = QtWidgets.QFrame(self.centralwidget)
-        self.frame_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame_2.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frame_2.setObjectName("frame_2")
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.frame_2)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.label = QtWidgets.QLabel(self.frame_2)
-        self.label.setObjectName("label")
-        self.verticalLayout.addWidget(self.label)
-        self.label_2 = QtWidgets.QLabel(self.frame_2)
-        self.label_2.setObjectName("label_2")
-        self.verticalLayout.addWidget(self.label_2)
-        self.lineEdit = QtWidgets.QLineEdit(self.frame_2)
-        sizePolicy = QtWidgets.QSizePolicy(
-                            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(
-                                self.lineEdit.sizePolicy().hasHeightForWidth())
-        self.lineEdit.setSizePolicy(sizePolicy)
-        self.lineEdit.setObjectName("lineEdit")
-        self.verticalLayout.addWidget(self.lineEdit)
-        spacerItem = QtWidgets.QSpacerItem(
-                20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem)
-        self.horizontalLayout_2.addWidget(self.frame_2)
+        self.hlayout = QtWidgets.QHBoxLayout(self.centralwidget)
+        # self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.centralwidget)
+        # self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        # self.frame_2 = QtWidgets.QFrame(self.centralwidget)
+        # self.frame_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        # self.frame_2.setFrameShadow(QtWidgets.QFrame.Raised)
+        # self.frame_2.setObjectName("frame_2")
+        # self.verticalLayout = QtWidgets.QVBoxLayout(self.frame_2)
+        # self.verticalLayout.setObjectName("verticalLayout")
+        # self.label = QtWidgets.QLabel(self.frame_2)
+        # self.label.setObjectName("label")
+        # self.verticalLayout.addWidget(self.label)
+        # self.label_2 = QtWidgets.QLabel(self.frame_2)
+        # self.label_2.setObjectName("label_2")
+        # self.verticalLayout.addWidget(self.label_2)
+        # self.lineEdit = QtWidgets.QLineEdit(self.frame_2)
+        # sizePolicy = QtWidgets.QSizePolicy(
+        #                     QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        # sizePolicy.setHorizontalStretch(0)
+        # sizePolicy.setVerticalStretch(0)
+        # sizePolicy.setHeightForWidth(
+        #                         self.lineEdit.sizePolicy().hasHeightForWidth())
+        # self.lineEdit.setSizePolicy(sizePolicy)
+        # self.lineEdit.setObjectName("lineEdit")
+        # self.verticalLayout.addWidget(self.lineEdit)
+        # spacerItem = QtWidgets.QSpacerItem(
+        #         20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        # self.verticalLayout.addItem(spacerItem)
+        # self.horizontalLayout_2.addWidget(self.frame_2)
         self.frame_plot = QtWidgets.QFrame(self.centralwidget)
-        self.frame_plot.setMinimumSize(QtCore.QSize(500, 0))
+        # self.frame_plot.setMinimumSize(QtCore.QSize(500, 0))
+        self.frame_plot.setSizePolicy(QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding))
         self.frame_plot.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame_plot.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame_plot.setObjectName("frame_plot")
-        self.horizontalLayout_2.addWidget(self.frame_plot)
+        self.hlayout.addWidget(self.frame_plot)
+        # self.horizontalLayout_2.addWidget(self.frame_plot)
         MainWindow.setCentralWidget(self.centralwidget)
 
        # self.retranslateUi(MainWindow)
@@ -84,19 +89,37 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.setupUi(self)
 
         # create the matplotlib widget and put it in the frame on the right
-        self.ui.plotWidget = Mpwidget(parent=self.ui.frame_plot)
+        self.ui.plotWidget = Plot3dWidget(parent=self.ui.frame_plot)
 
-class Mpwidget(FigureCanvas):
+
+class Plot3dWidget(FigureCanvas):
     def __init__(self, parent=None):
 
-        self.figure = Figure(facecolor=(0, 0, 0))
-        super(Mpwidget, self).__init__(self.figure)
+        self.figure = Figure(facecolor=(180/255, 0, 0))
+        super(Plot3dWidget, self).__init__(self.figure)
         self.setParent(parent)
 
         # plot random 3D data
         self.axes = self.figure.add_subplot(111, projection='3d')
         self.data = np.random.random((3, 100))
         self.axes.plot(self.data[0, :], self.data[1, :], self.data[2, :])
+        self.axes.set_xlabel('X')
+        self.axes.set_ylabel('Y')
+        self.axes.set_zlabel('Z')
+        self.installEventFilter(self)
+
+    def eventFilter(self, source, event):
+        if event.type() == QtCore.QEvent.Wheel:
+            print('Caught mouse wheel')
+            # self.axes.set_xlabel('X')  #TODO remove (test to update canvas programmatically)
+            # self.axes.set_ylabel('Y')
+            # self.axes.set_zlabel('Z')
+            # self.draw()
+
+            if event.modifiers() == QtCore.Qt.ControlModifier:
+                print('TODO Zoom')
+            return True
+        return super().eventFilter(source, event)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

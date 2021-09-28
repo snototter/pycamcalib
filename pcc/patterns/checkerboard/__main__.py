@@ -178,11 +178,10 @@ if __name__ == '__main__':
     print('img', image_points[:12,0,:])
     print('obj', object_points[:12, :])
     imvis.imshow(board.image(), title='board', wait_ms=-1)
-    assert False
 
     from vito import pyutils
     from ..imgdir import ImageDirectorySource
-    src = ImageDirectorySource('example-ccb')
+    src = ImageDirectorySource('example-scb')
     image_points = list()
     object_points = list()
     img_shape = None
