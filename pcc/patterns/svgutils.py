@@ -92,7 +92,7 @@ def export_board(board_specification, output_basename: str=None, output_folder: 
 def overlay_pattern_specification(dwg: svgwrite.Drawing, text_line1: str, text_line2: str,
                                   board_height_mm: float, available_space_mm: float, offset_left_mm: float,
                                   font_size_mm: int = 4, line_padding_mm: int = 1,
-                                  overlay_color: str = 'rgb(120, 120, 120)'):
+                                  color_overlay: str = 'rgb(120, 120, 120)'):
     """Overlays the pattern specification strings onto the SVG drawing.
     Depending on the available free space at the bottom of the board this will:
     * Place both text_line arguments below each other, or
@@ -112,7 +112,7 @@ def overlay_pattern_specification(dwg: svgwrite.Drawing, text_line1: str, text_l
             return f'{v}mm'
 
         top = min(board_height_mm - available_space_mm, board_height_mm - text_height_mm) + font_size_mm
-        overlay = dwg.add(dwg.g(style=f"font-size:{_mm(font_size_mm)};font-family:monospace;stroke:none;fill:{overlay_color};"))
+        overlay = dwg.add(dwg.g(style=f"font-size:{_mm(font_size_mm)};font-family:monospace;stroke:none;fill:{color_overlay};"))
         if single_line:
             overlay.add(dwg.text(f'{text_line1} {text_line2}',
                                  insert=(_mm(offset_left_mm), _mm(top))))
