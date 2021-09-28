@@ -3,7 +3,7 @@ import logging
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    board = ClippedCheckerboardSpecification('checkerboard', num_squares_horizontal=5,
+    board = ClippedCheckerboardSpecification('clipped-checkerboard', num_squares_horizontal=5,
                                   num_squares_vertical=9,
                                   checkerboard_square_length_mm=25)#, overlay_board_specifications=False)
     from .. import export_board
