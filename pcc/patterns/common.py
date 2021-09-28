@@ -220,21 +220,27 @@ def fully_qualified_classname(obj):
     return m + '.' + c.__qualname__
 
 
+# Known paper formats as (width, height). Currently, we only include
+# suitable DIN A# formats
+PAPER_DIMENSIONS = {
+    'A0': (841, 1189),  # German: "Vierfachbogen"
+    'A1': (594, 841),  # "Doppelbogen"
+    'A2': (420, 594),  # "Bogen"
+    'A3': (297, 420),  # "Halbbogen"
+    'A4': (210, 297),  # "Viertelbogen"
+    'A5': (148, 210)  # "Blatt/Achtelbogen"
+}
+# Inverse mapping to lookup DIN format from given dimensions
+PAPER_FORMATS = { v: k for k, v in PAPER_DIMENSIONS.items() }
+
 def paper_format_str(width_mm, height_mm):
     """
     Returns the paper format corresponding to the given paper dimensions.
     If the size is not mapped to a format, a string representation 'Wmm x Hmm'
     will be returned instead.
     """
-    formats = {
-        (841, 1189): 'A0',  # German: "Vierfachbogen"
-        (594, 841): 'A1',  # "Doppelbogen"
-        (420, 594): 'A2',  # "Bogen"
-        (297, 420): 'A3',  # "Halbbogen"
-        (210, 297): 'A4',  # "Viertelbogen"
-        (148, 210): 'A5'  # "Blatt/Achtelbogen"
-    }
     key = (width_mm, height_mm)
-    if key in formats:
-        return formats[key]
+    if key in PAPER_FORMATS:
+        return PAPER_FORMATS[key]
     return f'{width_mm}mm x {height_mm}mm'
+

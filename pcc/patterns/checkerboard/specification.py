@@ -62,8 +62,8 @@ reference_points: Object points in 3d to be used as reference/correspondences
 
     overlay_board_specifications: bool = True
 
-    margin_horizontal_mm: int = field(init=False)
-    margin_vertical_mm: int = field(init=False)
+    margin_horizontal_mm: float = field(init=False)
+    margin_vertical_mm: float = field(init=False)
     reference_points: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self):
@@ -76,6 +76,7 @@ reference_points: Object points in 3d to be used as reference/correspondences
         if self.margin_vertical_mm < 0:
             raise SpecificationError('Vertical margin < 0 (too many squares per column).')
         # Set 3d object points (only consider INNER corners)
+        #FIXME check
         inner_rows = self.num_squares_vertical - 1
         inner_cols = self.num_squares_horizontal - 1
         self.reference_points = np.zeros((inner_cols * inner_rows, 3), np.float32)

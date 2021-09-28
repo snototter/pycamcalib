@@ -37,4 +37,5 @@ Camera calibration UI
   * [ ] Visualize camera/marker poses (3d plot)
   * [ ] Export calibration
   * [ ] Parallelization
-
+* TODO Documentation
+  * Conventions (`NxM` means number of squares, NOT internal corners)
