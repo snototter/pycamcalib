@@ -51,3 +51,21 @@ if __name__ == '__main__':
     rms, K, distortion, rvecs, tvecs = cv2.calibrateCamera(object_points, image_points, img_shape[::-1], None, None, flags=cv2.CALIB_FIX_K3)
     print('Calibration result:', rms, K, distortion, rvecs, tvecs)
     print(f'fx {K[0,0]}, fy {K[1, 1]}, cx {K[0, 2]}, cy {K[1,2]}')
+
+    h, w = img_shape
+    k_undistorted, roi_undistorted = cv2.getOptimalNewCameraMatrix(K, distortion, (w, h), 1, (w, h))
+
+    error = []
+    for i in range(len(object_points)):
+        tmp_img_pts, _ = cv2.projectPoints(object_points[i], rvecs[i], tvecs[i], K, distortion)
+        err = cv2.norm(image_points[i], tmp_img_pts, cv2.NORM_L2) / len(tmp_img_pts)
+        print(f'Reprojection error, img {i}: {err}')
+        error.append(err)
+
+    calibration_data = {"rms": rms, "k_distorted": K, "distortion": distortion,
+                "k_undistorted": k_undistorted, "roi_undistorted": roi_undistorted,
+                "rvecs": rvecs, "tvecs": tvecs,
+                "valid_image_paths": img_paths_valid,
+                "object_points": object_points,
+                "img_points": image_points,
+                "calibration_errors": error}

@@ -202,6 +202,7 @@ if __name__ == '__main__':
     
     rms, K, distortion, rvecs, tvecs = cv2.calibrateCamera(object_points, image_points, img_shape[::-1], None, None, flags=cv2.CALIB_FIX_K3)
     print('Calibration result:', rms, K, distortion, rvecs, tvecs)
+    print(f'fx {K[0,0]}, fy {K[1, 1]}, cx {K[0, 2]}, cy {K[1,2]}')
 
     h, w = img_shape
     k_undistorted, roi_undistorted = cv2.getOptimalNewCameraMatrix(K, distortion, (w, h), 1, (w, h))
