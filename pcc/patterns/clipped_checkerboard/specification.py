@@ -87,19 +87,25 @@ TODO double-check doc before release
         if self.margin_vertical_mm < 0:
             raise SpecificationError(f'Vertical margin {self.margin_vertical_mm} < 0 (too many squares per column). Check specification for {self}')
         # Set 3d object points (only consider INNER corners)
-        #FIXME check
-        inner_rows = self.num_squares_vertical - 1
-        inner_cols = self.num_squares_horizontal - 1
-        self.reference_points = np.zeros((inner_cols * inner_rows, 3), np.float32)
-        self.reference_points[:, :2] = np.mgrid[0:inner_cols, 0:inner_rows].T.reshape(-1, 2) * self.checkerboard_square_length_mm
+        #FIXME check order of ref points
+        self.reference_points = np.zeros((self.num_inner_corners_horizontal * self.num_inner_corners_vertical, 3), np.float32)
+        v, u = np.meshgrid(np.arange(self.num_inner_corners_vertical), np.arange(self.num_inner_corners_horizontal))
+        self.reference_points[:, 0] = u.flatten() * self.checkerboard_square_length_mm
+        self.reference_points[:, 1] = v.flatten() * self.checkerboard_square_length_mm
     
     # def __repr__(self) -> str:
     #     return f'[pcc] ClippedCheckerboard: {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} a {self.checkerboard_square_length_mm}mm'
+    @property
+    def num_inner_corners_horizontal(self):
+        return self.num_squares_horizontal
+    
+    @property
+    def num_inner_corners_vertical(self):
+        return self.num_squares_vertical
 
     def svg(self) -> svgwrite.Drawing:
         """Returns the SVG drawing of this calibration board."""
         _logger.info(f'Drawing calibration pattern: {self.name}')
-        print('TODO', self.__repr__())
         
         # Helper to put fully-specified coordinates (in millimeters)
         def _mm(v):

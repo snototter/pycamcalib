@@ -5,13 +5,10 @@ from vito import imutils
 
 
 class CheckerboardDetector(object):
-    def __init__(self, board_specification: CheckerboardSpecification):
+    def __init__(self, board_specification):
         self.board_spec = board_specification
-        # Number of inner corners
-        self.nrows = self.board_spec.num_squares_vertical - 1
-        self.ncols = self.board_spec.num_squares_horizontal - 1
-        # self.reference_points = np.zeros((1, self.nrows * self.ncols, 3), np.float32)
-        # self.reference_points[0, :, :2] = np.mgrid[0:self.nrows, 0:self.ncols].T.reshape(-1, 2)
+        self.nrows = self.board_spec.num_inner_corners_vertical
+        self.ncols = self.board_spec.num_inner_corners_horizontal
 
     def process(self, image: np.ndarray):
         image_points = None

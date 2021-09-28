@@ -76,11 +76,17 @@ reference_points: Object points in 3d to be used as reference/correspondences
         if self.margin_vertical_mm < 0:
             raise SpecificationError('Vertical margin < 0 (too many squares per column).')
         # Set 3d object points (only consider INNER corners)
-        #FIXME check
-        inner_rows = self.num_squares_vertical - 1
-        inner_cols = self.num_squares_horizontal - 1
-        self.reference_points = np.zeros((inner_cols * inner_rows, 3), np.float32)
-        self.reference_points[:, :2] = np.mgrid[0:inner_cols, 0:inner_rows].T.reshape(-1, 2) * self.checkerboard_square_length_mm
+        #FIXME check order of points
+        self.reference_points = np.zeros((self.num_inner_corners_horizontal * self.num_inner_corners_vertical, 3), np.float32)
+        self.reference_points[:, :2] = np.mgrid[0:self.num_inner_corners_horizontal, 0:self.num_inner_corners_vertical].T.reshape(-1, 2) * self.checkerboard_square_length_mm
+
+    @property
+    def num_inner_corners_horizontal(self):
+        return self.num_squares_horizontal - 1
+    
+    @property
+    def num_inner_corners_vertical(self):
+        return self.num_squares_vertical - 1
 
     def svg(self) -> svgwrite.Drawing:
         """Returns the SVG drawing of this calibration board."""
@@ -115,7 +121,7 @@ reference_points: Object points in 3d to be used as reference/correspondences
 
         # Overlay pattern information
         if self.overlay_board_specifications:
-            fmt_str = f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm'
+            fmt_str = f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm, margins: {self.margin_horizontal_mm:.1f}mm x {self.margin_vertical_mm:.1f}mm'
             overlay_pattern_specification(dwg, 'pcc::Checkerboard', fmt_str,
                                           board_height_mm=self.board_height_mm,
                                           available_space_mm=self.margin_vertical_mm * 0.6,

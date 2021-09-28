@@ -166,21 +166,12 @@ if __name__ == '__main__':
                                       board_width_mm=210, board_height_mm=297,
                                       checkerboard_square_length_mm=25,
                                       num_squares_horizontal=6, num_squares_vertical=10)
+    #TODO export demo
     from .. import export_board
     export_board(board, prevent_overwrite=False)
-
-    # imvis.imshow(board.image(), title='Calibration Board', wait_ms=-1)
-
     assert False
 
     detector = CheckerboardDetector(board)
-    # image = imutils.imread('cb-10x6-example.jpg')
-    # image_points, object_points = detector.process(image)
-    # print(image_points.shape, object_points.shape)  
-    # print(image_points.dtype, object_points.dtype)  
-    #TODO assert dtype float32, and shape img pt: Nx1x2, pattern: 1xNx3
-
-    print(board)
 
     from vito import pyutils
     from ..imgdir import ImageDirectorySource
