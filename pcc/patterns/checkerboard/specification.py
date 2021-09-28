@@ -7,7 +7,7 @@ from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 from dataclasses import dataclass, field
 from vito import imutils
-from ..svgutils import svgwrite2image #TODO overlay-board-specs
+from ..svgutils import svgwrite2image, overlay_pattern_specification
 from ..common import paper_format_str
 # from collections import deque
 # from ..common import GridIndex, Rect, Point, sort_points_ccw, center, SpecificationError
@@ -64,7 +64,7 @@ reference_points: Object points in 3d to be used as reference/correspondences
 
     margin_horizontal_mm: int = field(init=False)
     margin_vertical_mm: int = field(init=False)
-    reference_points: np.ndarray = field(init=False)
+    reference_points: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self):
         """Derives uninitialized attributes and performs sanity checks."""
@@ -117,30 +117,11 @@ reference_points: Object points in 3d to be used as reference/correspondences
         
         # Overlay pattern information
         if self.overlay_board_specifications:
-            font_size_mm = 4
-            line_padding_mm = 1
-            text_height_mm = 2 * (font_size_mm + line_padding_mm)
-            overlay_color = 'rgb(120, 120, 120)'
-            # If we don't have enough space, try adding only a single line of text:
-            available_space = self.margin_vertical_mm / 3
-            single_line = text_height_mm > available_space
-            if single_line:
-                text_height_mm = font_size_mm + line_padding_mm
-
-            if available_space < text_height_mm:
-                _logger.warning(f'Cannot overlay specification. Available space {available_space}mm is too small (requiring at least {text_height_mm} mm).')
-            else:
-                top = min(self.board_height_mm - available_space, self.board_height_mm - text_height_mm) + font_size_mm
-                overlay = dwg.add(dwg.g(style=f"font-size:{_mm(font_size_mm)};font-family:monospace;stroke:{overlay_color};stroke-width:1;fill:{overlay_color};"))
-                if single_line:
-                    overlay.add(dwg.text(f'pcc::Checkerboard {paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm',
-                                         insert=(_mm(self.margin_horizontal_mm / 4), _mm(top))))
-                else:
-                    overlay.add(dwg.text('pcc::Checkerboard', insert=(_mm(self.margin_horizontal_mm / 4), _mm(top))))
-                    top += font_size_mm + line_padding_mm
-                    overlay.add(dwg.text(f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm',
-                                        insert=(_mm(self.margin_horizontal_mm / 4), _mm(top))))
-
+            overlay_pattern_specification(dwg, 'pcc::Checkerboard',
+                                          f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm',
+                                          board_height_mm=self.board_height_mm,
+                                          available_space_mm=self.margin_vertical_mm / 2,
+                                          offset_left_mm=self.margin_horizontal_mm / 2)
         return dwg
 
     def image(self) -> np.ndarray:
