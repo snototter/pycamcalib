@@ -577,7 +577,7 @@ def save_eddie_assets():
 
     
 if __name__ == '__main__':
-    from ..export import export_pattern
+    from ..svgutils import export_pattern
     import os
     logging.basicConfig(level=logging.INFO,
                         format='[%(levelname)s] %(message)s')

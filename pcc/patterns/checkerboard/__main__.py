@@ -2,6 +2,7 @@ from PIL.Image import Image
 from . import CheckerboardSpecification
 from . import CheckerboardDetector, ClippedCheckerboardSpecification
 from ..common import PAPER_DIMENSIONS
+from .. import export_board
 import logging
 import cv2
 from vito import imvis, imutils
@@ -169,7 +170,6 @@ def demo_standard_checkerboard():
                                       checkerboard_square_length_mm=25,
                                       num_squares_horizontal=6, num_squares_vertical=10)
     
-    from .. import export_board
     export_board(board, prevent_overwrite=False)
     # assert False
 
@@ -227,13 +227,21 @@ def demo_standard_checkerboard():
 
 
 def demo_shifted_checkerboard():
+    # bwidth, bheight = PAPER_DIMENSIONS['A3']
+    # board = ClippedCheckerboardSpecification('shifted-a3',
+    #                                          board_width_mm=bwidth, board_height_mm=bheight,
+    #                                          num_squares_horizontal=13,
+    #                                          num_squares_vertical=19,
+    #                                          checkerboard_square_length_mm=20)#, overlay_board_specifications=False)
+    # export_board(board, prevent_overwrite=False)
+
     bwidth, bheight = PAPER_DIMENSIONS['A4']
     board = ClippedCheckerboardSpecification('clipped-checkerboard',
                                              board_width_mm=bwidth, board_height_mm=bheight,
                                              num_squares_horizontal=6,
                                              num_squares_vertical=8,
                                              checkerboard_square_length_mm=30)#, overlay_board_specifications=False)
-    from .. import export_board
+    
     export_board(board, prevent_overwrite=False, export_png=False)
     # # assert False
 
