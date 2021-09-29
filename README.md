@@ -45,6 +45,15 @@ Camera calibration UI
   * [ ] Visualize camera/marker poses (3d plot)
   * [ ] Export calibration
   * [ ] Parallelization
+* UI elements
+  * [x] Folder selection
+  * [ ] Board selection (pre-configured vs custom)
+  * [ ] Board config widget checkerboard std/shifted
+  * [ ] Board config widget eddie
+  * [ ] Preproc UI (list view)
+  * [ ] image board/gallery (show original, preprocessed, detected, coverage)
+  * [ ] matplotlib 3d plot
+  * [ ] Export/save widget
 * TODO Documentation
   * Conventions (`NxM` means number of squares, NOT internal corners)
 
