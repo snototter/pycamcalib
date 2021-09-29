@@ -13,5 +13,5 @@ from .common import SpecificationError
 from .svgutils import export_board
 
 # Import specific patterns only as a submodule
-from . import eddie
 from . import checkerboard
+from . import eddie
