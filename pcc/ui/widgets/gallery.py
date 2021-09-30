@@ -8,12 +8,12 @@ class PlaceholderWidget(QWidget):
     """Placeholder during development (until we have proper ImageViewer set up)"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(100, 75)
+        self.setMinimumSize(200, 150)
         colors = [QColor(255, 0, 0), QColor(0, 255, 0), QColor(0, 0, 255), QColor(255, 255, 0), QColor(255, 0, 255), QColor(0, 255, 255), QColor(0, 0, 0), QColor(255, 255, 255)]
         self.bg_color = colors[randint(0, len(colors)-1)]
 
     def paintEvent(self, event):
-        pen_width = 3
+        pen_width = 6
         painter = QPainter()
         painter.begin(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -30,3 +30,6 @@ class PlaceholderWidget(QWidget):
         # painter.drawRoundedRect(0, 0, self.size().width(), self.size().height(), 10)
         painter.end()
         # return super().paintEvent(event)()
+
+# https://www.pythonguis.com/tutorials/qscrollarea/
+# https://stackoverflow.com/questions/20041385/python-pyqt-setting-scroll-area
