@@ -31,6 +31,8 @@ if __name__ == '__main__':
     groupbox_imgview.setLayout(QtWidgets.QVBoxLayout())
     groupbox_imgview.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
     layout.addWidget(groupbox_imgview)
+    from .widgets.gallery import PlaceholderWidget
+    groupbox_imgview.layout().addWidget(PlaceholderWidget())
 
     groupbox_progress = QtWidgets.QGroupBox("Progress")
     groupbox_progress.setLayout(QtWidgets.QHBoxLayout())
