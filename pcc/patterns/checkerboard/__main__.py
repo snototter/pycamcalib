@@ -182,7 +182,7 @@ def demo_standard_checkerboard():
     imvis.imshow(board.image(), title='board', wait_ms=-1)
 
     from vito import pyutils
-    from ..imgdir import ImageDirectorySource
+    from ...calibration import ImageDirectorySource
     src = ImageDirectorySource('example-scb')
     image_points = list()
     object_points = list()
@@ -257,7 +257,7 @@ def demo_shifted_checkerboard():
     imvis.imshow(board.image(), title='Calibration Board', wait_ms=-1)
 
     from vito import pyutils
-    from ..imgdir import ImageDirectorySource
+    from ...calibration import ImageDirectorySource
     import cv2
     src = ImageDirectorySource('example-ccb')
     image_points = list()

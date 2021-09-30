@@ -24,12 +24,26 @@ class ImageDirectorySource(object):
             raise FileNotFoundError(f"No image files in folder '{folder}'")
 
     def is_available(self) -> bool:
+        """Returns True if there is a file not yet accessed via next()."""
         return 0 <= self.idx < len(self.files)  # Python allows chained comparisons
 
     def next(self) -> typing.Tuple[np.ndarray, str]:
+        """Loads the next image and additionally returns the (full) filename."""
         if not self.is_available():
             return None, None
         fn = os.path.join(self.folder, self.files[self.idx])
         img = imutils.imread(fn)
         self.idx += 1
         return img, fn
+
+    def num_images(self):
+        return len(self.files)
+
+    def filenames(self):
+        """Returns a list of all (basename) image names within the folder."""
+        return self.files
+
+    def images(self):
+        """Returns a list of all images."""
+        # TODO future extension: check memory usage (maybe it's useful to cache the images)
+        return [imutils.imread(os.path.join(self.folder, self.files[i])) for i in range(len(self.files))]
