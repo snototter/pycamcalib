@@ -1,6 +1,6 @@
 from PIL.Image import Image
 from . import CheckerboardSpecification
-from . import CheckerboardDetector, ClippedCheckerboardSpecification
+from . import CheckerboardDetector, ShiftedCheckerboardSpecification
 from ..common import PAPER_DIMENSIONS
 from .. import export_board
 import logging
@@ -228,7 +228,7 @@ def demo_standard_checkerboard():
 
 def demo_shifted_checkerboard():
     # bwidth, bheight = PAPER_DIMENSIONS['A3']
-    # board = ClippedCheckerboardSpecification('shifted-a3',
+    # board = ShiftedCheckerboardSpecification('shifted-a3',
     #                                          board_width_mm=bwidth, board_height_mm=bheight,
     #                                          num_squares_horizontal=13,
     #                                          num_squares_vertical=19,
@@ -236,7 +236,7 @@ def demo_shifted_checkerboard():
     # export_board(board, prevent_overwrite=False)
 
     bwidth, bheight = PAPER_DIMENSIONS['A4']
-    board = ClippedCheckerboardSpecification('clipped-checkerboard',
+    board = ShiftedCheckerboardSpecification('shifted-checkerboard',
                                              board_width_mm=bwidth, board_height_mm=bheight,
                                              num_squares_horizontal=6,
                                              num_squares_vertical=8,

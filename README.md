@@ -30,7 +30,7 @@ Camera calibration UI
   * [ ] Refine matches via FCA/ICA
   * [ ] Refactoring
 * [ ] Extensions
-  * [x] Integrate standard checkerboard & clipped/shifted checkerboard
+  * [x] Integrate standard checkerboard & shifted checkerboard
   * [ ] Preprocessing submodule (histeq, binarization fixed/adaptive, normalization, cutoff bi-ended-slider, ...)
   * [ ] Each pattern should provide config widget (import/export config JSON or TOML, export SVG/PNG/PDF)
   * [ ] Each pattern should provide preconfigured calibration boards

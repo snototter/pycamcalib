@@ -6,24 +6,15 @@ from ..common import paper_format_str, SpecificationError
 from ..svgutils import svgwrite2image, overlay_pattern_specification
 
 
-_logger = logging.getLogger('ClippedCheckerboard')
+_logger = logging.getLogger('ShiftedCheckerboard')
 
 
 @dataclass
-class ClippedCheckerboardSpecification(object):
-    """This class encapsulates the parameters of a clipped checkerboard
-calibration board, where the first & last rows/columns contain clipped
-"squares". Thus, if you specify N squares per row, the board will have (N-1)
-full squares along each row, with a leading and trailing "half square". For
-example, with num_squares_horizontal = 5 the board would look like:
-  _____________
-  |
-  |  xx  xx  x
-  | x  xx  xx
-  | x  xx  xx
-  |  xx  xx  x
-  |  xx  xx  x
-       ...
+class ShiftedCheckerboardSpecification(object):
+    """This class encapsulates the parameters of a shifted checkerboard
+calibration board, where the first & last rows/columns contain "half
+squares". Thus, if you specify N squares per row, the board will have (N-1)
+full squares along each row, with a leading and trailing "half square".
 Consequently, this board will have N x M inner corners if N = number
 of squares per row and M = number of squares per column.
 
@@ -50,8 +41,6 @@ overlay_board_specifications: Flag to enable/disable overlay of the board
 
 margin_horizontal_mm, margin_vertical_mm: Distance from the edge of the physical
         board to the closest outer square edge.
-
-TODO double-check doc before release
 """
 
     name: str
@@ -144,7 +133,7 @@ TODO double-check doc before release
         # Overlay pattern information
         if self.overlay_board_specifications:
             fmt_str = f'{paper_format_str(self.board_width_mm, self.board_height_mm)}, {self.num_squares_horizontal}x{self.num_squares_vertical} \u00E0 {self.checkerboard_square_length_mm}mm, margins: {self.margin_horizontal_mm:.1f}mm x {self.margin_vertical_mm:.1f}mm'
-            overlay_pattern_specification(dwg, 'pcc::ClippedCheckerboard', fmt_str,
+            overlay_pattern_specification(dwg, 'pcc::ShiftedCheckerboard', fmt_str,
                                           board_height_mm=self.board_height_mm,
                                           available_space_mm=self.margin_vertical_mm * 0.6,
                                           offset_left_mm=square_length_half_mm/2,
