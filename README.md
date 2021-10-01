@@ -56,4 +56,6 @@ Camera calibration UI
   * [ ] Export/save widget
 * TODO Documentation
   * Conventions (`NxM` means number of squares, NOT internal corners)
-
+* Change opencv-python install
+  * Issue: https://stackoverflow.com/questions/52337870/python-opencv-error-current-thread-is-not-the-objects-thread
+  * Potential solution (setup.py): https://stackoverflow.com/questions/68436434/how-to-instruct-pip-to-install-a-requirement-with-no-binary-flag
