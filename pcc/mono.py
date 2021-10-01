@@ -8,7 +8,7 @@ import sys
 
 from numpy.lib.shape_base import split
 from .processing import ImageDirectorySource, NoImageDirectoryError, DirectoryNotFoundError
-from .ui.widgets import displayError, ImageSourceSelectorWidget, CalibrationPatternSelector
+from .ui.widgets import displayError, CalibrationInputWidget, PreprocessingSelector
 import logging
 
 _logger = logging.getLogger('MonoCalibrationGui')
@@ -53,66 +53,51 @@ class MonoCalibrationGui(QMainWindow):
     
     def _initLayout(self):
         layout_main = QVBoxLayout()
-        splitter = QSplitter(Qt.Vertical)
-        layout_main.addWidget(splitter)
+        splitter_main = QSplitter(Qt.Vertical)
+        layout_main.addWidget(splitter_main)
         ########### 1st row
-        widget_row1 = QWidget()
-        splitter.addWidget(widget_row1)
-        #### Image source
+        splitter_row1 = QSplitter(Qt.Horizontal)
+        splitter_main.addWidget(splitter_row1)
+        #### Image selection & pattern specification
         layout_row1 = QGridLayout()
-        widget_row1.setLayout(layout_row1)
-        # layout_main.addLayout(layout_row1)
         groupbox_input = QGroupBox("Images && Pattern")
         # groupbox_input.setCheckable(True) # TODO test (could be used to implement a collapsible box)
         groupbox_input.setLayout(QVBoxLayout())
-        # groupbox_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout_row1.addWidget(groupbox_input, 0, 0)#, Qt.AlignTop)
-        layout_row1.setColumnStretch(0, 1)
-        layout_row1.setColumnStretch(1, 3)
+        # groupbox_input.setStyleSheet("border: 1px solid gray; border-color: #ff17365d;")
+        splitter_row1.addWidget(groupbox_input)
 
-        # self.image_source_selector = ImageSourceSelectorWidget()
-        # self.image_source_selector.folderSelected.connect(self._folderSelected)
-        # self.image_source_selector.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        # groupbox_input.layout().addWidget(self.image_source_selector)
-
-        # groupbox_pattern = QGroupBox("Calibration Pattern")
-        # groupbox_pattern.setLayout(QVBoxLayout())
-        # groupbox_pattern.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        # layout_row1.addWidget(groupbox_pattern, 0, 1)
-
-        self.pattern_selector = CalibrationPatternSelector()
-        self.pattern_selector.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        # groupbox_pattern.layout().addWidget(self.pattern_selector)
-        groupbox_input.layout().addWidget(self.pattern_selector)
+        self.calib_input = CalibrationInputWidget()
+        self.calib_input.imageFolderSelected.connect(self._folderSelected)
+        self.calib_input.patternConfigurationChanged.connect(self._patternConfigChanged)
+        self.calib_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        groupbox_input.layout().addWidget(self.calib_input)
 
         #### Preprocessing pipeline
         groupbox_preproc = QGroupBox("Preprocessing")
         groupbox_preproc.setLayout(QVBoxLayout())
-        # groupbox_preproc.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        # layout_row1.addWidget(groupbox_preproc)
-        dummy = CalibrationPatternSelector()
+        dummy = PreprocessingSelector() #TODO
         dummy.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         groupbox_preproc.layout().addWidget(dummy)
-        layout_row1.addWidget(groupbox_preproc, 0, 1)
+        splitter_row1.addWidget(groupbox_preproc)
         
         ########### 2nd row (image gallery)
         self.groupbox_imgview = QGroupBox("Images")
         self.groupbox_imgview.setLayout(QVBoxLayout())
         self.groupbox_imgview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         # layout_main.addWidget(self.groupbox_imgview)
-        splitter.addWidget(self.groupbox_imgview)
+        splitter_main.addWidget(self.groupbox_imgview)
         from .ui.widgets.gallery import PlaceholderWidget
         self.groupbox_imgview.layout().addWidget(PlaceholderWidget())
         self.groupbox_imgview.setEnabled(False)
 
-        splitter.setSizes([1, 2]) #TODO
+        splitter_main.setSizes([1, 3]) #TODO add 3rd row (results)
         # splitter.setHandleWidth(80)
         # splitter.setOpaqueResize(False)
         # splitter.setStyleSheet("background-color: #333;")
         central_widget = QWidget()
         central_widget.setLayout(layout_main)
         self.setCentralWidget(central_widget)
-    
+
     def _createStatusBar(self):
         self.status_bar = QStatusBar()
         self.progress_bar = QProgressBar()
@@ -137,10 +122,14 @@ class MonoCalibrationGui(QMainWindow):
             self.status_bar.showMessage(f'Loaded {src.num_images()} images from {folder}', 10000)
         except (DirectoryNotFoundError, NoImageDirectoryError) as e:
             _logger.error("Error while loading image files:", exc_info=e)
-            self.status_bar.showMessage(f'Error loading images from {folder}')
-            displayError(f"Error while opening {folder}", informative_text=str(e), parent=self)
-            self.image_source_selector.reset()
+            self.status_bar.showMessage(f'Error while loading images from {folder} ({e.__class__.__name__})')
+            displayError(f"Error while loading images.", informative_text=str(e), parent=self)
+            self.calib_input.resetImageFolder()
             #TODO self reset
+    
+    @Slot()
+    def _patternConfigChanged(self):
+        print('TODO pattern config changed')
 
 
 # theme/style: https://pythonbasics.org/pyqt-style/
@@ -149,7 +138,7 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     # print(QtWidgets.QStyleFactory.keys())
     # app.setStyle('Windows')
-    # app.setStyle(QStyleFactory.create("Cleanlooks"))
+    # app.setStyle(QStyleFactory.create("Windows"))
     gui = MonoCalibrationGui()
     gui.show()
     app.exec_()

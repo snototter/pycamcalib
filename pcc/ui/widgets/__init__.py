@@ -1,3 +1,3 @@
 from .common import displayError
-from .input_source import ImageSourceSelectorWidget
-from .pattern_selector import CalibrationPatternSelector
+from .calib_input import CalibrationInputWidget
+from .preprocessing import PreprocessingSelector

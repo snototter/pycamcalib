@@ -5,8 +5,9 @@ from PySide2.QtWidgets import QWidget
 
 class ImageLabel(QWidget):
     """Widget to display an image, always resized to the widgets dimensions."""
-    def __init__(self, pixmap=None, parent=None):
+    def __init__(self, pixmap=None, center_vertical=True, parent=None):
         super(ImageLabel, self).__init__(parent)
+        self._center_vertical = center_vertical
         self._pixmap = pixmap
 
     def pixmap(self):
@@ -22,7 +23,6 @@ class ImageLabel(QWidget):
             return
         painter = QPainter(self)
         pm_size = self._pixmap.size()
-        print('TODO event.rect().size:', event.rect().size())
         pm_size.scale(event.rect().size(), Qt.KeepAspectRatio)
         # Draw resized pixmap using nearest neighbor interpolation instead
         # of bilinear/smooth interpolation (omit the Qt.SmoothTransformation
@@ -30,6 +30,6 @@ class ImageLabel(QWidget):
         scaled = self._pixmap.scaled(
                 pm_size, Qt.KeepAspectRatio)
         pos = QPoint(
-            (event.rect().width() - scaled.width()) // 2, 0)
-            # (event.rect().height() - scaled.height()) // 2)
+            (event.rect().width() - scaled.width()) // 2,
+            (event.rect().height() - scaled.height()) // 2 if self._center_vertical else 0)
         painter.drawPixmap(pos, scaled)

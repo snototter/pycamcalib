@@ -9,9 +9,15 @@ Each calibration pattern submodule consists of:
 * Detector -
 """
 # Import common utils and export functionality for convenience
+from pcc.patterns.checkerboard.detection import CheckerboardDetector
 from .common import SpecificationError
 from .svgutils import export_board
 
 # Import specific patterns only as a submodule
 from . import checkerboard
 from . import eddie
+
+PATTERNS = {
+  'Checkerboard': (checkerboard.CheckerboardSpecification, checkerboard.CheckerboardDetector),
+  'Eddie': (None, None) #TODO
+}

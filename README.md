@@ -59,3 +59,12 @@ Camera calibration UI
 * Change opencv-python install
   * Issue: https://stackoverflow.com/questions/52337870/python-opencv-error-current-thread-is-not-the-objects-thread
   * Potential solution (setup.py): https://stackoverflow.com/questions/68436434/how-to-instruct-pip-to-install-a-requirement-with-no-binary-flag
+  * Don't want to fix opencv version yet (maybe after deployment, to ensure major version is 2 or 3), thus for now: 
+    1) set up venv
+    2) pip install -r requirements.txt
+    3) grab a coffee, go for a walk...
+    4) pip install -e .
+    
+    opencv-python --no-binary opencv-python
+
+  
