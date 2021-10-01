@@ -79,6 +79,8 @@ class MonoCalibrationGui(QMainWindow):
         dummy.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         groupbox_preproc.layout().addWidget(dummy)
         splitter_row1.addWidget(groupbox_preproc)
+
+        # splitter_row1.setSizes([4, 5])
         
         ########### 2nd row (image gallery)
         self.groupbox_imgview = QGroupBox("Images")
