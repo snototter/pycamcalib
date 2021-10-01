@@ -12,16 +12,26 @@ def _is_image_filename(f):
     return ext.lower() in img_extensions
 
 
+class DirectoryNotFoundError(Exception):
+    """Wrong directory path."""
+    pass
+
+
+class NoImageDirectoryError(Exception):
+    """Directory contains no (supported) image files."""
+    pass
+
+
 class ImageDirectorySource(object):
     """Allows iterating all images of a local directory in sorted order."""
     def __init__(self, folder):
         if not os.path.exists(folder):
-            raise FileNotFoundError(f"No such folder '{folder}'")
+            raise DirectoryNotFoundError(f"No such folder '{folder}'")
         self.folder = folder
         self.files = sorted([f for f in os.listdir(folder) if _is_image_filename(f)])
         self.idx = 0
         if len(self.files) == 0:
-            raise FileNotFoundError(f"No image files in folder '{folder}'")
+            raise NoImageDirectoryError(f"No image files in folder '{folder}'")
 
     def is_available(self) -> bool:
         """Returns True if there is a file not yet accessed via next()."""
