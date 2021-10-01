@@ -16,6 +16,11 @@ Camera calibration UI
   * Correspondence search is obviously tricky
   * For sub-pixel accuracy, we need inverse compositional image alignment
 
+## Setup
+TODO mention opencv-python/opencv/qt issue  
+either use opencv-python + CLI, or install system package opencv + link their bindings (simple `cv2.pth`)
+
+
 ## Status
 * [ ] Use configurable template
   * [x] Render to SVG
