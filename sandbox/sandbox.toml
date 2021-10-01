@@ -1,0 +1,26 @@
+type = "mono"
+image_folder = "TODO"
+
+#[pattern]
+#type = "checkerboard"
+#shifted = "true"
+#TODO
+
+
+[preprocessing]
+[[preprocessing.operation]]
+name = "grayscale"
+enabled = true
+
+[[preprocessing.operation]]
+name = "gamma"
+gamma = 0.4
+
+[[preprocessing.operation]]
+name = "clahe"
+tile_size = [8, 8]
+clip_limit = 2.0
+
+[[preprocessing.operation]]
+name = "gamma"
+gamma = 1.2

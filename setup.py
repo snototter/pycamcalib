@@ -16,7 +16,7 @@ setuptools.setup(
     install_requires=[
         'vito', 'wheel', 'numpy', 'svglib', 'svgwrite', 'dataclasses',
         'opencv-python',  # specifying as in https://stackoverflow.com/a/68437088 does not work :(
-        'pyside2', 'qimage2ndarray'],
+        'pyside2', 'qimage2ndarray', 'toml'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

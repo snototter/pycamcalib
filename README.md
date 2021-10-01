@@ -65,6 +65,6 @@ Camera calibration UI
     3) grab a coffee, go for a walk...
     4) pip install -e .
     
-    opencv-python --no-binary opencv-python
-
+    opencv-python --no-binary opencv-python # FIXME this only works for GUI (CLI then no longer works...)
+    use system-wide opencv (with official pybindings instead, see setup scripts)
   
