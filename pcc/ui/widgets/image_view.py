@@ -30,6 +30,6 @@ class ImageLabel(QWidget):
         scaled = self._pixmap.scaled(
                 pm_size, Qt.KeepAspectRatio)
         pos = QPoint(
-            (event.rect().width() - scaled.width()) // 2,
-            (event.rect().height() - scaled.height()) // 2)
+            (event.rect().width() - scaled.width()) // 2, 0)
+            # (event.rect().height() - scaled.height()) // 2)
         painter.drawPixmap(pos, scaled)

@@ -80,7 +80,7 @@ class ImageSourceSelectorWidget(QWidget):
     def initLayout(self, icon_size):
         layout = QHBoxLayout(self)
         # Button
-        self._button = QPushButton('Open folder')
+        self._button = QPushButton(' Open folder')
         self._button.setIcon(QIcon.fromTheme('document-open'))
         self._button.setIconSize(icon_size)
         self._button.setToolTip('Open folder')  #TODO should we register shortcut in main widget (Ctrl+O)?
