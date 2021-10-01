@@ -1,6 +1,7 @@
 from PySide2.QtCore import Signal, Slot
 from PySide2.QtWidgets import QHBoxLayout, QListWidget, QListWidgetItem, QPushButton, QVBoxLayout, QWidget
 from ...processing import Preprocessor, AVAILABLE_PREPROCESSOR_OPERATIONS
+import inspect
 
 class AddOperationItem(QWidget):
     addOperation = Signal(str)
@@ -33,7 +34,9 @@ class PreprocessingSelector(QWidget):
         layout.addWidget(self.list_widget)
 
         for opcls in AVAILABLE_PREPROCESSOR_OPERATIONS:
-            print(f'TODO add op to list: {opcls.name} "{opcls.description}"')
+            sig = inspect.signature(opcls.__init__)
+            is_configurable = len(sig.parameters) > 1
+            print(f'TODO add op to list: {opcls.name} "{opcls.description}", is configurable: {is_configurable}')
         #TODO add grayscale by default!
         # Add item
         item = QListWidgetItem(self.list_widget)
