@@ -6,7 +6,7 @@ from PySide2.QtGui import QIcon
 import pathlib
 
 
-def shorten_path(element, path_str):
+def shortenPath(element, path_str):
     """Clips the given text such that it fits within the element's rendered width."""
     width_target = element.width() * 0.95  # We want to keep a minor margin
     width_text = element.fontMetrics().boundingRect(path_str).width()
@@ -74,17 +74,17 @@ class ImageSourceSelectorWidget(QWidget):
     def __init__(self, icon_size=QSize(20, 20), parent=None):
         super().__init__(parent)
         self._folder = None
-        self._setup_layout(icon_size)
+        self.initLayout(icon_size)
         self.installEventFilter(self)
 
-    def _setup_layout(self, icon_size):
+    def initLayout(self, icon_size):
         layout = QHBoxLayout(self)
         # Button
         self._button = QPushButton('Open folder')
         self._button.setIcon(QIcon.fromTheme('document-open'))
         self._button.setIconSize(icon_size)
         self._button.setToolTip('Open folder')  #TODO should we register shortcut in main widget (Ctrl+O)?
-        self._button.clicked.connect(self._select_folder)
+        self._button.clicked.connect(self._selectFolder)
         self._button.setMinimumHeight(20)
         self._button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         layout.addWidget(self._button)
@@ -96,27 +96,27 @@ class ImageSourceSelectorWidget(QWidget):
         # print(self._button.sizeHint(), self._label.sizeHint())
 
     @Slot()
-    def _select_folder(self):
+    def _selectFolder(self):
         # Let the user select a directory
         selection = str(QFileDialog.getExistingDirectory(self, "Select Calibration Directory"))
         if len(selection) > 0 and pathlib.Path(selection).exists():
             self._folder = selection
             self.folderSelected.emit(self._folder)
-        self._update_label()
+        self._updateLabel()
 
-    def _update_label(self):
+    def _updateLabel(self):
         # Display the selected directory path on the label
         txt = '' if self._folder is None else self._folder
-        self._label.setText(shorten_path(self._label, txt))
+        self._label.setText(shortenPath(self._label, txt))
         self._label.update()
 
     def eventFilter(self, source, event):
         if (event.type() == QtCore.QEvent.Resize):
             # Adjust text display
-            self._update_label()
+            self._updateLabel()
         return super().eventFilter(source, event)
 
     def reset(self):
         """Use this to manually/programmatically clear the selected folder."""
         self._folder = None
-        self._update_label()
+        self._updateLabel()
