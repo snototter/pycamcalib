@@ -9,6 +9,7 @@ from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QFileDial
 from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrection, PreProcOpGrayscale, PreProcOpHistEq #TODO remove
 from ...processing import ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
 from .common import HLine, displayError, ignoreMessageCallback
+from .preprocessing_configs import PreProcOpConfigDialog
 
 #TODO tasks:
 # * save TOML
@@ -34,11 +35,11 @@ class NumberLabel(QLabel):
 class OperationItem(QWidget):
     """A single row of the list widget corresponding to a configured
     preprocessing operation."""
-    #TODO emit config changed
     moveUp = Signal(int)
     moveDown = Signal(int)
     toggled = Signal(int, bool)
     remove = Signal(int)
+    configurationChanged = Signal(int)
 
     def __init__(self, operation, list_index, number_operations, parent=None):
         super().__init__(parent)
@@ -61,6 +62,7 @@ class OperationItem(QWidget):
         if is_configurable:
             btn_config = QToolButton()
             btn_config.setText('Configure')
+            btn_config.clicked.connect(self._configure)
             layout.addWidget(btn_config)
 
         # Allow the user to quickly enable/disable a single preprocessing step
@@ -90,10 +92,22 @@ class OperationItem(QWidget):
 
         self.setLayout(layout)
 
+    @Slot()
+    def _configure(self):
+        #TODO how to pass input image from the selector's preprocessor instance to this list item? (callback to retrieve the latest image?)
+        # preprocessor must support running the pipeline only partially
+        dlg = PreProcOpConfigDialog(self.operation, None, self)
+        if dlg.exec_():
+#FIXME check if adjusting the parameters is persistent (within the preprocessor's list!)
+            print(f'TODO operation has been changed: {self.operation}')
+            self.configurationChanged.emit(self.list_index)
+        else:
+            dlg.restoreConfiguration()
+
     def update(self):
+        print('FUCK UPDATE!!!')
         self.label.setText(self.operation.description())
         return super().update()
-#FIXME check if adjusting the parameters is persistent (within the preprocessor's list!)
 
 class AddOperationItem(QWidget):
     """Special list item which allows adding another preprocessing operation"""
@@ -199,10 +213,6 @@ class PreprocessingSelector(QWidget):
         self.setLayout(layout_main)
     
     def _updateList(self):
-        #TODO remove:
-        import toml
-        print('CHECK FROZEN PREPROC:\n', toml.dumps(self.preprocessor.freeze()))
-
         self.list_widget.clear()
 
         for idx, op in enumerate(self.preprocessor.operations):
@@ -211,6 +221,7 @@ class PreprocessingSelector(QWidget):
             self.list_widget.addItem(item)
             # Initialize the operation item widget
             item_widget = OperationItem(op, idx, len(self.preprocessor.operations))
+            item_widget.configurationChanged.connect(self._operationConfigured)
             item_widget.moveUp.connect(self._moveUp)
             item_widget.moveDown.connect(self._moveDown)
             item_widget.toggled.connect(self._operationToggled)
@@ -263,6 +274,11 @@ class PreprocessingSelector(QWidget):
         self.preprocessor.add_operation(operation)
         self._updateList()
 
+    @Slot(int)
+    def _operationConfigured(self, _):
+        print('FOOOO updating list_widget', str(self.preprocessor.operations[_]))
+        self._updateList()
+
     @Slot()
     def _loadPipeline(self):
         # Let the user select a TOML file. getOpenFileName also returns the applied file filter
@@ -298,4 +314,3 @@ class PreprocessingSelector(QWidget):
                 filename += '.toml'
             self.preprocessor.saveTOML(filename)
             self.showMessage(f'Preprocessing pipeline has been saved to {filename}', 10000)
-#TODO serialize to verify affected changes

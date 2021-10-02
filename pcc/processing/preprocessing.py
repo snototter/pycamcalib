@@ -61,7 +61,7 @@ class PreProcOpGrayscale(PreProcOperationBase):
     """Converts an image to grayscale"""
 
     name = 'grayscale'
-    display = 'Grayscale'
+    display = 'Grayscale Conversion'
     
     def description(self) -> str:
         return self.display
@@ -72,7 +72,6 @@ class PreProcOpGrayscale(PreProcOperationBase):
         return image
 
 
-#TODO configurable (add config widget)! limit gamma!
 class PreProcOpGammaCorrection(PreProcOperationBase):
     """Applies Gamma correction"""
 
@@ -95,7 +94,7 @@ class PreProcOpGammaCorrection(PreProcOperationBase):
 
     def set_gamma(self, gamma: float) -> None:
         """Precomputes the internal lookup table"""
-        self.gamma = gamma
+        self.gamma = float(gamma)
         g_inv = 1.0 / self.gamma
         self.lookup_table = np.clip(np.array([((intensity / 255.0) ** g_inv) * 255
                                              for intensity in np.arange(0, 256)]).astype(np.uint8),
@@ -202,16 +201,6 @@ AVAILABLE_PREPROCESSOR_OPERATIONS = [
     PreProcOpGrayscale, PreProcOpGammaCorrection,
     PreProcOpHistEq, PreProcOpCLAHE
 ]
-
-## Removed because we want a custom ordering within the UI combobox
-# def generate_operation_mapping():
-#     """Returns a 'name':class mapping for all preprocessing operations
-#     defined within this module."""
-#     operations = dict()
-#     for name, obj in inspect.getmembers(sys.modules[__name__]):
-#         if inspect.isclass(obj) and name.startswith('PreProcOp'):
-#             operations[obj.name] = obj
-#     return operations
 
 
 class Preprocessor(object):
