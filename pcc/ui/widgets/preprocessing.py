@@ -1,17 +1,29 @@
-from PySide2.QtCore import Qt, Signal, Slot
-from PySide2.QtGui import QPalette
-from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSizePolicy, QSpacerItem, QToolButton, QVBoxLayout, QWidget
-
-from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrection, PreProcOpGrayscale, PreProcOpHistEq
-from ...processing import Preprocessor, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
 import inspect
+import logging
+import os
+import pathlib
+from PySide2.QtCore import QSize, Qt, Signal, Slot
+from PySide2.QtGui import QIcon, QPalette
+from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSizePolicy, QSpacerItem, QToolButton, QVBoxLayout, QWidget
 
-from .common import HLine
+from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrection, PreProcOpGrayscale, PreProcOpHistEq #TODO remove
+from ...processing import ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
+from .common import HLine, displayError
 
 #TODO tasks:
-# * load and save (TOML)
+# * load TOML
+#   * open file, init preprocessor
+#   DONE * preprocessor restore ops
+# * save TOML
+#   * ops freeze, preprocessor freeze/toml export
+#   * select file
 # * image display (and combine with image loading - populate first image)
+#   lot of work
 # * configure
+#   medium work (clahe + gamma)
+
+_logger = logging.getLogger('PreprocessingUI')
+
 
 class NumberLabel(QLabel):
     """Fixed width label to display operation number in list widget."""
@@ -24,6 +36,8 @@ class NumberLabel(QLabel):
 
 
 class OperationItem(QWidget):
+    """A single row of the list widget corresponding to a configured
+    preprocessing operation."""
     #TODO emit config changed
     moveUp = Signal(int)
     moveDown = Signal(int)
@@ -124,19 +138,55 @@ class AddOperationItem(QWidget):
 
 
 class PreprocessingSelector(QWidget):
-    def __init__(self, parent=None):
+    """Two-column widget to configure & preview the preprocessing pipeline.
+    TODO if images are available, they must be populated to slot X
+    """
+
+    def __init__(self, icon_size=QSize(20, 20), parent=None):
         super().__init__(parent)
+        # We always start with grayscale conversion
         self.preprocessor = Preprocessor()
         self.preprocessor.add_operation(PreProcOpGrayscale())
+        # Supported file filters for loading/saving:
+        self._file_filters = ["All Files (*.*)", "TOML (*.toml)"]
+        self._file_filter_preferred_idx = 1
+
         #TODO remove the rest
         self.preprocessor.add_operation(PreProcOpGammaCorrection())
         self.preprocessor.add_operation(PreProcOpHistEq())
         self.preprocessor.add_operation(PreProcOpCLAHE())
-        self._initLayout()
+
+        # For saving the pipeline, we suggest the user the same directory
+        # a config has been loaded from (if config will be loaded).
+        # Empty string results in the current/last opened directory (qt default)
+        self._previously_selected_folder = ''
+
+        # Set up UI
+        self._initLayout(icon_size)
         self._updateList()
 
-    def _initLayout(self):
-        layout = QVBoxLayout()
+    def _initLayout(self, icon_size):
+        layout_main = QVBoxLayout()
+        # 1st row: load/save
+        layout_controls = QHBoxLayout()
+        layout_main.addLayout(layout_controls)
+
+        btn_load = QPushButton(' Load')
+        btn_load.setIcon(QIcon.fromTheme('document-open'))
+        btn_load.setIconSize(icon_size)
+        btn_load.setToolTip('Load Preprocessing Pipeline')
+        btn_load.setMinimumHeight(icon_size.height() + 6)
+        btn_load.clicked.connect(self._loadPipeline)
+        layout_controls.addWidget(btn_load)
+
+        self._btn_save = QPushButton(' Save')
+        self._btn_save.setIcon(QIcon.fromTheme('document-open'))
+        self._btn_save.setIconSize(icon_size)
+        self._btn_save.setToolTip('Save Preprocessing Pipeline')
+        self._btn_save.setMinimumHeight(icon_size.height() + 6)
+        self._btn_save.clicked.connect(self._savePipeline)
+        layout_controls.addWidget(self._btn_save)
+
         self.list_widget = QListWidget()
         # Disable selection/highlighting:
         self.list_widget.setSelectionMode(QAbstractItemView.NoSelection)
@@ -146,15 +196,19 @@ class PreprocessingSelector(QWidget):
         self.list_widget.setPalette(palette)
         # self.list_widget.setAlternatingRowColors(True) #Doesn't work
         # self.list_widget.setStyleSheet("alternate-background-color: white; background-color: blue;")
-        layout.addWidget(self.list_widget)
-        self.setLayout(layout)
+        layout_main.addWidget(self.list_widget)
+        self.setLayout(layout_main)
     
     def _updateList(self):
+        #TODO remove:
+        import toml
+        print('CHECK FROZEN PREPROC:\n', toml.dumps(self.preprocessor.freeze()))
+
         self.list_widget.clear()
 
         for idx, op in enumerate(self.preprocessor.operations):
             # Add a default item
-            item = QListWidgetItem()#self.list_widget)
+            item = QListWidgetItem()
             self.list_widget.addItem(item)
             # Initialize the operation item widget
             item_widget = OperationItem(op, idx, len(self.preprocessor.operations))
@@ -173,9 +227,11 @@ class PreprocessingSelector(QWidget):
         item.setSizeHint(item_widget.minimumSizeHint())
         self.list_widget.setItemWidget(item, item_widget)
 
+        # Enable/disable save button depending on configured pipeline
+        self._btn_save.setEnabled(len(self.preprocessor.operations) > 0)
+
     @Slot(int)
     def _moveUp(self, op_idx):
-        print('TODO move up ', op_idx)
         self.preprocessor.swap_previous(op_idx)
         # Rebuilding the list is easier (takeItem/insertItem needs further
         # investigation, because of the custom ItemWidget - additionally,
@@ -196,7 +252,6 @@ class PreprocessingSelector(QWidget):
 
     @Slot(int, bool)
     def _operationToggled(self, op_idx, enabled):
-        print('OP TOGGLED: ', op_idx, enabled)#TODO
         self.preprocessor.set_enabled(op_idx, enabled)
 
     @Slot(PreProcOperationBase)
@@ -204,4 +259,29 @@ class PreprocessingSelector(QWidget):
         self.preprocessor.add_operation(operation)
         self._updateList()
 
+    @Slot()
+    def _loadPipeline(self):
+        # Let the user select a TOML file
+        # getOpenFileName also return the applied file filter
+        filename, _ = QFileDialog.getOpenFileName(self, 'Load Preprocessing Pipeline from TOML file',
+                                                  self._previously_selected_folder,
+                                                  ';;'.join(self._file_filters),
+                                                  self._file_filters[self._file_filter_preferred_idx])
+        if len(filename) > 0 and pathlib.Path(filename).exists():
+            # Store corresponding folder for subsequent open/save directory suggestions
+            self._previously_selected_folder = os.path.dirname(filename)
+            try:
+                self.preprocessor.loadTOML(filename)
+            except (FileNotFoundError, ConfigurationError) as e:
+                _logger.error("Error while loading TOML preprocessor configuration:", exc_info=e)
+                displayError(f"Error while loading TOML preprocessor configuration.",
+                             informative_text=f'{e.__class__.__name__}: {str(e)}',
+                             parent=self)
+            self._updateList()
+
+
+    @Slot()
+    def _savePipeline(self):
+        pass
+        #TODO use prev sel folder
 #TODO serialize to verify affected changes

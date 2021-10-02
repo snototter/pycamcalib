@@ -7,20 +7,19 @@ image_folder = "TODO"
 #TODO
 
 
-[preprocessing]
-[[preprocessing.operation]]
+[[preprocessing.operations]]
 name = "grayscale"
 enabled = true
 
-[[preprocessing.operation]]
+[[preprocessing.operations]]
 name = "gamma"
 gamma = 0.4
 
-[[preprocessing.operation]]
+[[preprocessing.operations]]
 name = "clahe"
 tile_size = [8, 8]
 clip_limit = 2.0
 
-[[preprocessing.operation]]
+[[preprocessing.operations]]
 name = "gamma"
 gamma = 1.2

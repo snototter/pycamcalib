@@ -1,6 +1,8 @@
 """Common/basic UI widgets & functionality."""
 from PySide2.QtWidgets import QFrame, QHBoxLayout, QLabel, QMessageBox, QProgressBar, QSizePolicy, QWidget
 
+# QIcon.fromTheme: use system theme icons, see naming specs at
+# https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
 
 def displayMessage(icon_type: int, title: str, text: str, informative_text: str, parent=None):
     msg = QMessageBox(parent)

@@ -1,10 +1,14 @@
 """Starts the monocular calibration GUI."""
 
 #TODO move stereo/mono to .ui
+import io
+import sys
+import time
+import traceback
 from PySide2 import QtWidgets
 from PySide2.QtCore import Qt, Slot
 from PySide2.QtWidgets import QApplication, QDesktopWidget, QGridLayout, QGroupBox, QHBoxLayout, QMainWindow, QProgressBar, QSizePolicy, QSplitter, QStatusBar, QStyleFactory, QToolBar, QVBoxLayout, QWidget
-import sys
+from numpy import disp
 
 from numpy.lib.shape_base import split
 from .processing import ImageDirectorySource, NoImageDirectoryError, DirectoryNotFoundError
@@ -13,7 +17,8 @@ import logging
 
 _logger = logging.getLogger('MonoCalibrationGui')
 
-
+#TODO implement:
+# * global catch (for potentially unhandled exceptions) https://www.riverbankcomputing.com/pipermail/pyqt/2009-May/022961.html
 #TODO check:
 # not yet: https://realpython.com/python-menus-toolbars/
 # tabs: "input" "results" https://pythonspot.com/pyqt5-tabs/
@@ -132,6 +137,33 @@ class MonoCalibrationGui(QMainWindow):
     @Slot()
     def _patternConfigChanged(self):
         print('TODO pattern config changed')
+
+
+def globalExceptionHook(excType, excValue, tracebackobj):
+    """
+    Global function to catch unhandled exceptions.
+    Taken (with minor modifications and obvious API changes) from
+    https://www.riverbankcomputing.com/pipermail/pyqt/2009-May/022961.html
+    
+    @param excType exception type
+    @param excValue exception value
+    @param tracebackobj traceback object
+    """
+    separator = '-' * 80
+    timestr = time.strftime("%Y-%m-%d, %H:%M:%S")
+    tbinfofile = io.StringIO()
+    traceback.print_tb(tracebackobj, None, tbinfofile)
+    tbinfofile.seek(0)
+    tbinfo = tbinfofile.read()
+    errmsg = f'{excType}:\n{str(excValue)}'
+
+    sections = [separator, timestr, separator, errmsg, separator, tbinfo]
+    displayError('An unhandled exception occurred. Please report the problem.',
+                 title='Unhandled Exception',
+                 informative_text='\n'.join(sections))
+
+
+sys.excepthook = globalExceptionHook
 
 
 # theme/style: https://pythonbasics.org/pyqt-style/

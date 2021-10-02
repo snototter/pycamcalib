@@ -1,7 +1,7 @@
 import pathlib
 from PySide2.QtCore import QEvent, QSize, Qt, Signal, Slot
 from PySide2.QtGui import QColor, QFont, QIcon, QImage, QPainter, QPen, QPixmap
-from PySide2.QtWidgets import QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSpacerItem, QWidget
+from PySide2.QtWidgets import QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSpacerItem, QToolButton, QWidget
 from .image_view import ImageLabel
 from ..image_conversion import pixmapFromNumpy
 from ...patterns import PATTERNS
@@ -124,7 +124,7 @@ class CalibrationInputWidget(QWidget):
         self._btn_folder.setIcon(QIcon.fromTheme('document-open'))
         self._btn_folder.setIconSize(icon_size)
         self._btn_folder.setToolTip('Open folder')  #TODO should we register shortcut in main widget (Ctrl+O)?
-        self._btn_folder.setMinimumHeight(20)
+        self._btn_folder.setMinimumHeight(icon_size.height())
         self._btn_folder.clicked.connect(self._selectImageFolder)
         layout.addWidget(self._btn_folder, 0, 0, 1, 1, Qt.AlignTop)
 
@@ -181,7 +181,7 @@ class CalibrationInputWidget(QWidget):
     @Slot()
     def _selectImageFolder(self):
         # Let the user select a directory
-        selection = str(QFileDialog.getExistingDirectory(self, "Select Calibration Image Directory"))
+        selection = str(QFileDialog.getExistingDirectory(self, 'Select Calibration Image Directory'))
         if len(selection) > 0 and pathlib.Path(selection).exists():
             self._folder = selection
             self.imageFolderSelected.emit(self._folder)

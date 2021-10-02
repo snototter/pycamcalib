@@ -20,6 +20,10 @@ _logger = logging.getLogger('Preprocessing')
 #             operations[obj.name] = obj
 #     return operations
 
+class ConfigurationError(Exception):
+    """Error upon loading or adjusting parameters of a preprocessor operations."""
+    pass
+
 
 class PreProcOperationBase(object):
     """Base class of preprocessing operations.
@@ -241,26 +245,44 @@ class Preprocessor(object):
             i+=1
         return image
 
-#TODO saveTOML/freeze/todict
-    def loadTOML(self, filename):
-        _logger.info(f'Trying to load preprocessing pipeline from {filename}')
-        config = toml.load(filename)
+    def freeze(self):
+        """Returns a dictionary which can be used to restore the current state
+        of this preprocessing pipeline.
+        Nested dict structure is intended to allow a) having a separate configuration
+        file for this pipeline and b) merge it with other (sub)module configurations.
+        """
+        return {'preprocessing': {'operations': [op.freeze() for op in self.operations]}}
 
+    def saveTOML(self, filename):
+        """Stores the current state of this preprocessing pipeline to disk."""
+        with open(filename, 'w'):
+            toml.dump(self.freeze())
+
+    def loadTOML(self, filename):
+        """Loads the preprocessing pipeline from the given TOML file.
+        The operations must be configured as [[preprocessing.operations]]
+        entries."""
+        _logger.info(f'Trying to load preprocessing pipeline from {filename}')
         try:
-            for op_config in config['preprocessing']['operation']:
+            config = toml.load(filename)
+            self.operations.clear()
+            for op_config in config['preprocessing']['operations']:
                 operation = self._operation_map[op_config['name']]()
                 if len(op_config) > 1:
                     operation.configure(op_config)
                 self.add_operation(operation)
         except KeyError as e:
-            _logger.error(f'Invalid TOML configuration:', exc_info=e)
-
+            raise ConfigurationError(f"Invalid/missing configuration key '{str(e)}'") from None
+        except FileNotFoundError:
+            raise ConfigurationError(f"Configuration file not found: '{filename}'") from None
+        except (toml.TomlDecodeError, TypeError) as e:
+            raise ConfigurationError(f"Invalid TOML configuration: {e}") from None
 
 
 #TODO remove
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    op_map = generate_operation_mapping()
+    # op_map = generate_operation_mapping()
 
     import os
     from vito import imvis
