@@ -276,7 +276,6 @@ class PreprocessingSelector(QWidget):
 
     @Slot(int)
     def _operationConfigured(self, _):
-        print('FOOOO updating list_widget', str(self.preprocessor.operations[_]))
         self._updateList()
 
     @Slot()
