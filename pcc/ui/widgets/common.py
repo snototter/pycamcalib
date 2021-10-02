@@ -1,5 +1,5 @@
 """Common/basic UI widgets & functionality."""
-from PySide2.QtWidgets import QHBoxLayout, QLabel, QMessageBox, QProgressBar, QSizePolicy, QWidget
+from PySide2.QtWidgets import QFrame, QHBoxLayout, QLabel, QMessageBox, QProgressBar, QSizePolicy, QWidget
 
 
 def displayMessage(icon_type: int, title: str, text: str, informative_text: str, parent=None):
@@ -13,3 +13,11 @@ def displayMessage(icon_type: int, title: str, text: str, informative_text: str,
 
 def displayError(text: str, title: str = 'Error', informative_text: str = '', parent=None):
     displayMessage(QMessageBox.Critical, title, text, informative_text, parent)
+
+
+class HLine(QFrame):
+    """A horizontal line (divider)."""
+    def __init__(self, parent=None):
+        super(HLine, self).__init__(parent)
+        self.setFrameShape(QFrame.HLine)
+        self.setFrameShadow(QFrame.Sunken)

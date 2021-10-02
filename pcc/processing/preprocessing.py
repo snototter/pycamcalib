@@ -3,7 +3,6 @@ import cv2
 # import sys
 # import inspect
 import numpy as np
-from numpy.lib.shape_base import tile
 from vito import imutils
 import toml
 import logging
@@ -22,11 +21,12 @@ _logger = logging.getLogger('Preprocessing')
 #     return operations
 
 
-class _PreProcOperation(object):
+class PreProcOperationBase(object):
     """Base class of preprocessing operations.
     
 Basic requirements for each derived class:
-* it must provide a unique 'name' attribute
+* it must provide a unique class-wide 'name' attribute
+* it must provide a class-wide 'display' attribute (speaking name for class selection before instantiation)
 * it must implement 'description() -> str' to return a brief but nicely formatted name (for UI display)
 * it must implement 'apply(np.ndarray) -> np.ndarray'
 * it must be registered within 'AVAILABLE_PREPROCESSOR_OPERATIONS'
@@ -60,13 +60,14 @@ If a derived class requires additional parameters:
         return d
 
 
-class PreProcOpGrayscale(_PreProcOperation):
+class PreProcOpGrayscale(PreProcOperationBase):
     """Converts an image to grayscale"""
 
     name = 'grayscale'
+    display = 'Grayscale'
     
     def description(self) -> str:
-        return 'Grayscale'
+        return self.display
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         if self.enabled:
@@ -75,10 +76,11 @@ class PreProcOpGrayscale(_PreProcOperation):
 
 
 #TODO configurable (add config widget)! limit gamma!
-class PreProcOpGammaCorrection(_PreProcOperation):
+class PreProcOpGammaCorrection(PreProcOperationBase):
     """Applies Gamma correction"""
 
     name = 'gamma'
+    display = 'Gamma Correction'
 
     def __init__(self, gamma: float = 1.0):
         super().__init__()
@@ -87,7 +89,7 @@ class PreProcOpGammaCorrection(_PreProcOperation):
         self.set_gamma(gamma)
 
     def description(self) -> str:
-        return f'Gamma Correction (g={self.gamma:.1f})'
+        return f'{self.display} (g={self.gamma:.1f})'
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         if not self.enabled:
@@ -115,16 +117,17 @@ class PreProcOpGammaCorrection(_PreProcOperation):
         return f'{self.name}(g={self.gamma:.1f})'
 
 
-class PreProcOpHistEq(_PreProcOperation):
+class PreProcOpHistEq(PreProcOperationBase):
     """Applies standard (fixed) histogram equalization.
 
 For RGB images, equalization is applied on the intensity (Y) channel after
 color conversion to YCrCb."""
 
     name = 'histeq'
+    display = 'Histogram Equalization'
 
     def description(self) -> str:
-        return 'Histogram Equalization'
+        return self.display
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         if not self.enabled:
@@ -139,10 +142,11 @@ color conversion to YCrCb."""
 
 
 #TODO configurable (tile size, clip limit), add widget!
-class PreProcOpCLAHE(_PreProcOperation):
+class PreProcOpCLAHE(PreProcOperationBase):
     """Applies contrast limited adaptive histogram equalization."""
 
     name = 'clahe'
+    display = 'CLAHE'
 
     def __init__(self, clip_limit: float = 2.0, tile_size: typing.Tuple[int, int] = (8, 8)):
         super().__init__()
@@ -152,7 +156,7 @@ class PreProcOpCLAHE(_PreProcOperation):
         self._set_clahe()
 
     def description(self) -> str:
-        return f'CLAHE (clip={self.clip_limit:.1f}, tile={self.tile_size})'
+        return f'{self.display} (clip={self.clip_limit:.1f}, tile={self.tile_size})'
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         if not self.enabled:
@@ -208,7 +212,7 @@ class Preprocessor(object):
         self.operations = list()
         self._operation_map = {opcls.name: opcls for opcls in AVAILABLE_PREPROCESSOR_OPERATIONS}
 
-    def add_operation(self, operation: _PreProcOperation):
+    def add_operation(self, operation: PreProcOperationBase):
         _logger.info(f'Adding operation #{len(self.operations)}: {operation}')
         self.operations.append(operation)
 
