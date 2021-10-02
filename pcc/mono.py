@@ -35,13 +35,12 @@ class MonoCalibrationGui(QMainWindow):
 
         self.image_source = None
         self.calibration_pattern = None
-        self.preprocessor = None
 
         # self.createActions()
         # self.createMenuBar()
         # self.createToolbars()
-        self._initLayout()
         self._createStatusBar()
+        self._initLayout()
         # toolbar_imgsrc = QToolBar('Image Source', self)
         # self.addToolBar(Qt.TopToolBarArea, toolbar_imgsrc)
 
@@ -80,9 +79,9 @@ class MonoCalibrationGui(QMainWindow):
         #### Preprocessing pipeline
         groupbox_preproc = QGroupBox("Preprocessing")
         groupbox_preproc.setLayout(QVBoxLayout())
-        dummy = PreprocessingSelector() #TODO
-        dummy.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        groupbox_preproc.layout().addWidget(dummy)
+        self.preproc_configurator = PreprocessingSelector(message_callback=self.status_bar.showMessage)
+        self.preproc_configurator.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        groupbox_preproc.layout().addWidget(self.preproc_configurator)
         splitter_row1.addWidget(groupbox_preproc)
 
         # splitter_row1.setSizes([4, 5])
@@ -129,7 +128,7 @@ class MonoCalibrationGui(QMainWindow):
             self.status_bar.showMessage(f'Loaded {src.num_images()} images from {folder}', 10000)
         except (DirectoryNotFoundError, NoImageDirectoryError) as e:
             _logger.error("Error while loading image files:", exc_info=e)
-            self.status_bar.showMessage(f'Error while loading images from {folder} ({e.__class__.__name__})')
+            self.status_bar.showMessage(f'Error while loading images from {folder} ({e.__class__.__name__})', 10000)
             displayError(f"Error while loading images.", informative_text=str(e), parent=self)
             self.calib_input.resetImageFolder()
             #TODO self reset

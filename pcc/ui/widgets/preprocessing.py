@@ -8,7 +8,7 @@ from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QFileDial
 
 from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrection, PreProcOpGrayscale, PreProcOpHistEq #TODO remove
 from ...processing import ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
-from .common import HLine, displayError
+from .common import HLine, displayError, ignoreMessageCallback
 
 #TODO tasks:
 # * save TOML
@@ -138,7 +138,7 @@ class PreprocessingSelector(QWidget):
     TODO if images are available, they must be populated to slot X
     """
 
-    def __init__(self, icon_size=QSize(20, 20), parent=None):
+    def __init__(self, message_callback=ignoreMessageCallback, icon_size=QSize(20, 20), parent=None):
         super().__init__(parent)
         # We always start with grayscale conversion
         self.preprocessor = Preprocessor()
@@ -146,6 +146,9 @@ class PreprocessingSelector(QWidget):
         # Supported file filters for loading/saving:
         self._file_filters = ["All Files (*.*)", "TOML (*.toml)"]
         self._file_filter_preferred_idx = 1
+        # Relevant status messages will be propagated to the parent's status
+        # bar via the specified message callback
+        self.showMessage = message_callback
 
         #TODO remove the rest
         self.preprocessor.add_operation(PreProcOpGammaCorrection())
@@ -262,8 +265,7 @@ class PreprocessingSelector(QWidget):
 
     @Slot()
     def _loadPipeline(self):
-        # Let the user select a TOML file
-        # getOpenFileName also return the applied file filter
+        # Let the user select a TOML file. getOpenFileName also returns the applied file filter
         filename, _ = QFileDialog.getOpenFileName(self, 'Load Preprocessing Pipeline from TOML file',
                                                   self._previously_selected_folder,
                                                   ';;'.join(self._file_filters),
@@ -273,8 +275,10 @@ class PreprocessingSelector(QWidget):
             self._previously_selected_folder = os.path.dirname(filename)
             try:
                 self.preprocessor.loadTOML(filename)
+                self.showMessage(f'Preprocessing pipeline has been loaded from {filename}', 10000)
             except (FileNotFoundError, ConfigurationError) as e:
                 _logger.error("Error while loading TOML preprocessor configuration:", exc_info=e)
+                self.showMessage(f'Error while TOML preprocessor configuration ({e.__class__.__name__})', 10000)
                 displayError(f"Error while loading TOML preprocessor configuration.",
                              informative_text=f'{e.__class__.__name__}: {str(e)}',
                              parent=self)
@@ -283,6 +287,15 @@ class PreprocessingSelector(QWidget):
 
     @Slot()
     def _savePipeline(self):
-        pass
-        #TODO use prev sel folder
+        # Let the user select the output (TOML) file. getSaveFileName also returns the applied file filter
+        filename, _ = QFileDialog.getSaveFileName(self, 'Choose TOML file to save Preprocessing Pipeline',
+                                                  self._previously_selected_folder,
+                                                  ';;'.join(self._file_filters),
+                                                  self._file_filters[self._file_filter_preferred_idx])
+        if len(filename) > 0:
+            # Append TOML extension if not provided
+            if not filename.endswith('.toml'):
+                filename += '.toml'
+            self.preprocessor.saveTOML(filename)
+            self.showMessage(f'Preprocessing pipeline has been saved to {filename}', 10000)
 #TODO serialize to verify affected changes

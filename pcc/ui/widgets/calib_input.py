@@ -6,6 +6,8 @@ from .image_view import ImageLabel
 from ..image_conversion import pixmapFromNumpy
 from ...patterns import PATTERNS
 
+#TODO message_callback (see preprocselector)
+
 # class CalibrationPatternSelector(QWidget):
 #     def __init__(self, parent=None):
 #         super().__init__(parent)

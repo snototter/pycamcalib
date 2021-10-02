@@ -17,6 +17,12 @@ def displayError(text: str, title: str = 'Error', informative_text: str = '', pa
     displayMessage(QMessageBox.Critical, title, text, informative_text, parent)
 
 
+def ignoreMessageCallback(text: str, timeout: int = 0):
+    """Dummy message 'display' if we don't want to pass the status bar callback
+    to the main window's child widgets."""
+    pass
+
+
 class HLine(QFrame):
     """A horizontal line (divider)."""
     def __init__(self, parent=None):

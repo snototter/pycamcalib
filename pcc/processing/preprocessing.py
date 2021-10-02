@@ -262,8 +262,8 @@ applied subsequently to a given image via 'process()'.
 
     def saveTOML(self, filename):
         """Stores the current state of this preprocessing pipeline to disk."""
-        with open(filename, 'w'):
-            toml.dump(self.freeze())
+        with open(filename, 'w') as fp:
+            toml.dump(self.freeze(), fp)
 
     def loadTOML(self, filename):
         """Loads the preprocessing pipeline from the given TOML file.
