@@ -1,6 +1,7 @@
 """Starts the monocular calibration GUI."""
 
 #TODO move stereo/mono to .ui
+import html
 import io
 import sys
 import time
@@ -159,7 +160,7 @@ def globalExceptionHook(excType, excValue, tracebackobj):
     sections = [separator, timestr, separator, errmsg, separator, tbinfo]
     displayError('An unhandled exception occurred. Please report the problem.',
                  title='Unhandled Exception',
-                 informative_text='\n'.join(sections))
+                 informative_text='<pre>' + html.escape('\n'.join(sections)) + '</pre>')
 
 
 sys.excepthook = globalExceptionHook
