@@ -27,7 +27,7 @@ class _PreProcOperation(object):
     
 Basic requirements for each derived class:
 * it must provide a unique 'name' attribute
-* it must provide a brief 'description' string (nicely formatted name)
+* it must implement 'description() -> str' to return a brief but nicely formatted name (for UI display)
 * it must implement 'apply(np.ndarray) -> np.ndarray'
 * it must be registered within 'AVAILABLE_PREPROCESSOR_OPERATIONS'
 
@@ -64,7 +64,9 @@ class PreProcOpGrayscale(_PreProcOperation):
     """Converts an image to grayscale"""
 
     name = 'grayscale'
-    description = 'Grayscale'
+    
+    def description(self) -> str:
+        return 'Grayscale'
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         if self.enabled:
@@ -77,13 +79,15 @@ class PreProcOpGammaCorrection(_PreProcOperation):
     """Applies Gamma correction"""
 
     name = 'gamma'
-    description = 'Gamma Correction'
 
     def __init__(self, gamma: float = 1.0):
         super().__init__()
         self.gamma = None
         self.lookup_table = None
         self.set_gamma(gamma)
+
+    def description(self) -> str:
+        return f'Gamma Correction (g={self.gamma:.1f})'
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         if not self.enabled:
@@ -118,7 +122,9 @@ For RGB images, equalization is applied on the intensity (Y) channel after
 color conversion to YCrCb."""
 
     name = 'histeq'
-    description = 'Histogram Equalization'
+
+    def description(self) -> str:
+        return 'Histogram Equalization'
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         if not self.enabled:
@@ -137,7 +143,6 @@ class PreProcOpCLAHE(_PreProcOperation):
     """Applies contrast limited adaptive histogram equalization."""
 
     name = 'clahe'
-    description = 'CLAHE'
 
     def __init__(self, clip_limit: float = 2.0, tile_size: typing.Tuple[int, int] = (8, 8)):
         super().__init__()
@@ -145,6 +150,9 @@ class PreProcOpCLAHE(_PreProcOperation):
         self.tile_size = tile_size
         self.clahe = None
         self._set_clahe()
+
+    def description(self) -> str:
+        return f'CLAHE (clip={self.clip_limit:.1f}, tile={self.tile_size})'
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         if not self.enabled:
@@ -208,6 +216,19 @@ class Preprocessor(object):
         """Enable/disable the operation at the given index."""
         self.operations[index].set_enabled(enabled)
 
+    def swap_previous(self, index: int):
+        """Swap operation at index with operation at index-1."""
+        self.operations[index], self.operations[index-1] = self.operations[index-1], self.operations[index]
+    
+    def swap_next(self, index: int):
+        """Swap operation at index with operation at index+1."""
+        #TODO check for out of bounds? (can't happen when called from ui)
+        self.operations[index], self.operations[index+1] = self.operations[index+1], self.operations[index]
+
+    def remove(self, index: int):
+        """Remove operation at index"""
+        del self.operations[index]
+
     def process(self, image):
         i = 0
         for op in self.operations:
@@ -216,6 +237,7 @@ class Preprocessor(object):
             i+=1
         return image
 
+#TODO saveTOML/freeze/todict
     def loadTOML(self, filename):
         _logger.info(f'Trying to load preprocessing pipeline from {filename}')
         config = toml.load(filename)
