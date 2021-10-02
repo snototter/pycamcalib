@@ -73,10 +73,10 @@ class InputFloat(QWidget):
             
         elif res in [QValidator.Invalid, QValidator.Intermediate]:
             self.line_edit.setStyleSheet("border: 3px solid red;")
-        #https://forum.qt.io/topic/120591/change-style-sheet-on-the-fly/10
+        #TODO not needed so far (un/polish trick) https://forum.qt.io/topic/120591/change-style-sheet-on-the-fly/10
         #https://8bitscoding.github.io/qt/ui/dynamic-p-and-s/
-        self.line_edit.style().unpolish(self.line_edit)
-        self.line_edit.style().polish(self.line_edit)
+        #self.line_edit.style().unpolish(self.line_edit)
+        #self.line_edit.style().polish(self.line_edit)
 
 
 class GammaCorrectionConfigWidget(QWidget):
