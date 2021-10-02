@@ -1,24 +1,17 @@
-import typing
 import cv2
-# import sys
-# import inspect
-import numpy as np
-from vito import imutils
-import toml
 import logging
+import numpy as np
+import toml
+import typing
+from vito import imutils
+
+#TODO implement additional ops:
+# * threshold variants, see e.g. https://towardsdatascience.com/image-enhancement-techniques-using-opencv-and-python-9191d5c30d45
+# * maybe add naive contrast adjustment I*alpha + beta https://towardsdatascience.com/exploring-image-processing-techniques-opencv-4860006a243
 
 
 _logger = logging.getLogger('Preprocessing')
 
-## Removed because we want a custom ordering within the UI combobox
-# def generate_operation_mapping():
-#     """Returns a 'name':class mapping for all preprocessing operations
-#     defined within this module."""
-#     operations = dict()
-#     for name, obj in inspect.getmembers(sys.modules[__name__]):
-#         if inspect.isclass(obj) and name.startswith('PreProcOp'):
-#             operations[obj.name] = obj
-#     return operations
 
 class ConfigurationError(Exception):
     """Error upon loading or adjusting parameters of a preprocessor operations."""
@@ -201,17 +194,32 @@ class PreProcOpCLAHE(PreProcOperationBase):
     def __repr__(self) -> str:
         return f'{self.name}(cl={self.clip_limit:.1f}, ts={self.tile_size})'
 
-# examples of different threshold types in cv2: https://towardsdatascience.com/image-enhancement-techniques-using-opencv-and-python-9191d5c30d45
-# class PreProcOpThreshold(object):
 
-#TODO maybe add naive contrast adjustment I*alpha + beta https://towardsdatascience.com/exploring-image-processing-techniques-opencv-4860006a243
-
+# List of all available preprocessing operations.
+# Since we want to provide a custom ordering of the operations in the UI, this
+# list cannot be retrieved automatically (e.g. via inspect)
 AVAILABLE_PREPROCESSOR_OPERATIONS = [
     PreProcOpGrayscale, PreProcOpGammaCorrection,
     PreProcOpHistEq, PreProcOpCLAHE
 ]
 
+## Removed because we want a custom ordering within the UI combobox
+# def generate_operation_mapping():
+#     """Returns a 'name':class mapping for all preprocessing operations
+#     defined within this module."""
+#     operations = dict()
+#     for name, obj in inspect.getmembers(sys.modules[__name__]):
+#         if inspect.isclass(obj) and name.startswith('PreProcOp'):
+#             operations[obj.name] = obj
+#     return operations
+
+
 class Preprocessor(object):
+    """Implements the preprocessing pipeline.
+
+This is the main "workflow" class, i.e. it holds a list of operations which are
+applied subsequently to a given image via 'process()'.
+    """
     def __init__(self):
         self.operations = list()
         self._operation_map = {opcls.name: opcls for opcls in AVAILABLE_PREPROCESSOR_OPERATIONS}
@@ -230,7 +238,6 @@ class Preprocessor(object):
     
     def swap_next(self, index: int):
         """Swap operation at index with operation at index+1."""
-        #TODO check for out of bounds? (can't happen when called from ui)
         self.operations[index], self.operations[index+1] = self.operations[index+1], self.operations[index]
 
     def remove(self, index: int):
@@ -279,7 +286,7 @@ class Preprocessor(object):
             raise ConfigurationError(f"Invalid TOML configuration: {e}") from None
 
 
-#TODO remove
+#TODO clean up or remove
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     # op_map = generate_operation_mapping()
@@ -294,9 +301,6 @@ if __name__ == '__main__':
     # pp.add_operation(PreProcOpGammaCorrection(2))
     # pp.add_operation(PreProcOpHistEq())
     # pp.add_operation(PreProcOpGrayscale())
-
-    #TODO add swap_previous, swap_next
-    #TODO toTOML, fromTOML
 
     imvis.imshow(img, wait_ms=10)
     img1 = pp.process(img)

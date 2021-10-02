@@ -11,16 +11,12 @@ from ...processing import ConfigurationError, Preprocessor, PreProcOpGrayscale, 
 from .common import HLine, displayError
 
 #TODO tasks:
-# * load TOML
-#   * open file, init preprocessor
-#   DONE * preprocessor restore ops
 # * save TOML
-#   * ops freeze, preprocessor freeze/toml export
 #   * select file
 # * image display (and combine with image loading - populate first image)
-#   lot of work
+#   a lot of work
 # * configure
-#   medium work (clahe + gamma)
+#   medium amount of work (clahe + gamma)
 
 _logger = logging.getLogger('PreprocessingUI')
 
@@ -232,6 +228,7 @@ class PreprocessingSelector(QWidget):
 
     @Slot(int)
     def _moveUp(self, op_idx):
+        # User wants to change the order of operations
         self.preprocessor.swap_previous(op_idx)
         # Rebuilding the list is easier (takeItem/insertItem needs further
         # investigation, because of the custom ItemWidget - additionally,
@@ -242,20 +239,24 @@ class PreprocessingSelector(QWidget):
 
     @Slot(int)
     def _moveDown(self, op_idx):
+        # User wants to change the order of operations
         self.preprocessor.swap_next(op_idx)
         self._updateList()
 
     @Slot(int)
     def _remove(self, op_idx):
+        # User wants to remove an operation
         self.preprocessor.remove(op_idx)
         self._updateList()
 
     @Slot(int, bool)
     def _operationToggled(self, op_idx, enabled):
+        # Checkbox enabled/disabled has been toggled
         self.preprocessor.set_enabled(op_idx, enabled)
 
     @Slot(PreProcOperationBase)
     def _addOperation(self, operation):
+        # User wants to add another operation to the pipeline
         self.preprocessor.add_operation(operation)
         self._updateList()
 
