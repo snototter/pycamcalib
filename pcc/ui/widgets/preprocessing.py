@@ -5,21 +5,14 @@ import pathlib
 from PIL.Image import Image
 from PySide2.QtCore import QSize, Qt, Signal, Slot
 from PySide2.QtGui import QIcon, QPalette
-from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSizePolicy, QSpacerItem, QToolButton, QVBoxLayout, QWidget
+from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSizePolicy, QSpacerItem, QToolButton, QVBoxLayout, QWidget
 
 from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrection, PreProcOpGrayscale, PreProcOpHistEq #TODO remove
 from ...processing import ImageSource, ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
 from .common import HorizontalLine, displayError, ignoreMessageCallback
 from .preprocessing_configs import PreProcOpConfigDialog
-from .preprocessing_preview import Previewer
+from .preprocessing_preview import Previewer, ImageComboboxWidget
 
-#TODO tasks:
-# * save TOML
-#   * select file
-# * image display (and combine with image loading - populate first image)
-#   a lot of work
-# * configure
-#   medium amount of work (clahe + gamma)
 
 _logger = logging.getLogger('PreprocessingUI')
 
@@ -68,14 +61,14 @@ class OperationItem(QWidget):
         if is_configurable:
             btn_config = QToolButton()
             btn_config.setText('Configure')
-            btn_config.clicked.connect(self._configure)
+            btn_config.clicked.connect(self.onConfigure)
             layout.addWidget(btn_config)
 
         # Allow the user to quickly enable/disable a single preprocessing step
-        cb = QCheckBox()
-        cb.setChecked(operation.enabled)
-        cb.stateChanged.connect(lambda state: self.toggled.emit(self.list_index, state==Qt.Checked))
-        layout.addWidget(cb)
+        self.checkbox = QCheckBox()
+        self.checkbox.setChecked(operation.enabled)
+        self.checkbox.stateChanged.connect(lambda state: self.toggled.emit(self.list_index, state==Qt.Checked))
+        layout.addWidget(self.checkbox)
 
         # Let the user reorder the pipeline with up/down movement
         btn_mv_up = QToolButton()
@@ -99,17 +92,21 @@ class OperationItem(QWidget):
         self.setLayout(layout)
 
     @Slot()
-    def _configure(self):
-        #TODO how to pass input image from the selector's preprocessor instance to this list item? (callback to retrieve the latest image?)
-        # preprocessor must support running the pipeline only partially
-        dlg = PreProcOpConfigDialog(self.image_source, self.preprocessor,
-                                    self.operation, self)
+    def onConfigure(self):
+        # Ensure that the operation is enabled
+        initially_enabled = self.operation.enabled
+        self.operation.set_enabled(True)
+        self.checkbox.setChecked(self.operation.enabled)
+        # Show configuration dialog
+        dlg = PreProcOpConfigDialog(self.list_index, self.image_source,
+                                    self.preprocessor, self.operation, self)
         if dlg.exec_():
             # Check if the parameters actually differ:
             if dlg.hasConfigurationChanged():
                 self.configurationChanged.emit(self.list_index)
         else:
             dlg.restoreConfiguration()
+            self.operation.set_enabled(initially_enabled)
 
     def update(self):
         self.label.setText(self.operation.description())
@@ -196,13 +193,11 @@ class PreprocessingSelector(QWidget):
         self._updateList()
 
     def _initLayout(self, icon_size):
-        layout_main = QHBoxLayout()
-        self.setLayout(layout_main)
-        layout_left = QVBoxLayout()
-        layout_main.addLayout(layout_left)
-        # 1st row: load/save
+        layout_main = QGridLayout()
+        ## 1st row: load/save + image selection
         layout_controls = QHBoxLayout()
-        layout_left.addLayout(layout_controls)
+        # layout_left.addLayout(layout_controls)
+        layout_main.addLayout(layout_controls, 0, 0, 1, 1)
 
         btn_load = QPushButton(' Load')
         btn_load.setIcon(QIcon.fromTheme('document-open'))
@@ -220,7 +215,12 @@ class PreprocessingSelector(QWidget):
         self._btn_save.clicked.connect(self.onSavePipeline)
         layout_controls.addWidget(self._btn_save)
 
-        # 2nd row contains the list widget
+        # Image selection
+        image_selection = ImageComboboxWidget(self.image_source)
+        self._imageSourceChanged.connect(image_selection.onImageSourceChanged)
+        layout_main.addWidget(image_selection, 0, 1, 1, 1)
+
+        # 2nd row contains the list widget + step slider
         self.list_widget = QListWidget()
         # Disable selection/highlighting:
         self.list_widget.setSelectionMode(QAbstractItemView.NoSelection)
@@ -228,18 +228,22 @@ class PreprocessingSelector(QWidget):
         palette.setColor(QPalette.Highlight, self.list_widget.palette().color(QPalette.Base))
         palette.setColor(QPalette.HighlightedText, self.list_widget.palette().color(QPalette.Text))
         self.list_widget.setPalette(palette)
-        # self.list_widget.setAlternatingRowColors(True) #Doesn't work
-        # self.list_widget.setStyleSheet("alternate-background-color: white; background-color: blue;")
-        layout_left.addWidget(self.list_widget)
+        # # self.list_widget.setAlternatingRowColors(True) #Doesn't work
+        # # self.list_widget.setStyleSheet("alternate-background-color: white; background-color: blue;")
+        # layout_left.addWidget(self.list_widget)
+        layout_main.addWidget(self.list_widget, 1, 0, 2, 1)
 
-        # 2nd column shows the preview
-        # layout_right = QVBoxLayout()
-        # layout_main.addLayout(layout_right)
-        self.preview = Previewer(self.image_source, self.preprocessor, True, -1)
-        self._imageSourceChanged.connect(self.preview.onImageSourceChanged)
+        layout_main.addWidget(QLabel('TODO step slider'), 1, 1, 1, 1)
+
+        # Preview
+        self.preview = Previewer(self.preprocessor, -1)
         self.preprocessorChanged.connect(self.preview.onPreprocessorChanged)
-        layout_main.addWidget(self.preview)
+        image_selection.imageSelectionChanged.connect(self.preview.onImageSelectionChanged)
+        # layout_main.addWidget(self.preview)
+        layout_main.addWidget(self.preview, 2, 1, 1, 1)
         # layout_right.addWidget(self.preview)
+        layout_main.setRowStretch(2, 10)
+        self.setLayout(layout_main)
 
     def _updateList(self):
         # Add all currently configured operations
@@ -355,6 +359,5 @@ class PreprocessingSelector(QWidget):
 
     @Slot(ImageSource)
     def onImageSourceChanged(self, image_source: ImageSource):
-        #TODO emit signal here to notify list items; update preview
+        self.image_source = image_source
         self._imageSourceChanged.emit(image_source)
-        #TODO update preview

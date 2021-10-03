@@ -240,6 +240,8 @@ applied subsequently to a given image via 'process()'.
         """Applies the configured operations subsequently to the given image.
         If num_steps <= 0, all operations are applied. Otherwise, only the first
         num_steps will be applied."""
+        if image is None:
+            return None
         for step, op in enumerate(self.operations):
             if num_steps >= 0 and step >= num_steps:
                 break

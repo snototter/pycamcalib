@@ -106,7 +106,7 @@ def shortenPath(element, path_str):
             width_text = element.fontMetrics().boundingRect(text).width()
         return text
 
-
+#TODO move pattern thumbnail below combobox!
 class CalibrationInputWidget(QWidget):
     """UI to select input image folder & configure the calibration target."""
 

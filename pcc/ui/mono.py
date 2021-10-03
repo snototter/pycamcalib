@@ -96,7 +96,8 @@ class MonoCalibrationGui(QMainWindow):
         groupbox_preproc.layout().addWidget(self.preproc_configurator)
         splitter_row1.addWidget(groupbox_preproc)
 
-        # splitter_row1.setSizes([4, 5])
+        #TODO use gridview instead of splitter for first row, because the following doesn't work:
+        # splitter_row1.setSizes([1, 4])
         
         ########### 2nd row (image gallery)
         #TODO connect _imageSourceChanged, preproc_config.preprocpipelineChanged

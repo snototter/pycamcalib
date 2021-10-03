@@ -4,12 +4,14 @@ import sys
 from PySide2.QtCore import Signal, Slot
 from PySide2.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
 
-from pcc.ui.widgets.preprocessing_preview import Previewer
+from pcc.ui.widgets.preprocessing_preview import Previewer, ImageComboboxWidget
 
 from ...processing import PreProcOpGammaCorrection, PreProcOpCLAHE
 from .common import displayError, ValidatedFloatInputWidget
 from .image_view import ImageViewer
 
+
+#TODO add CLAHEConfigWidget
 
 class GammaCorrectionConfigWidget(QWidget):
     operation_name = PreProcOpGammaCorrection.name
@@ -50,8 +52,9 @@ This will show a two-column dialog, with configuration options to the left and
 image preview to the right.
 In order to enable the image preview, the input_image must be given (i.e. the
 image which will be passed as input to the operation's 'apply()' method)."""
-    def __init__(self, image_source, preprocessor, operation, parent=None):
+    def __init__(self, preproc_step, image_source, preprocessor, operation, parent=None):
         super().__init__(parent)
+        self.preproc_step = preproc_step
         self.image_source = image_source
         self.preprocessor = preprocessor
         self.operation = operation
@@ -100,28 +103,21 @@ image which will be passed as input to the operation's 'apply()' method)."""
         gb_preview = QGroupBox("Preview")
         gb_preview.setLayout(QVBoxLayout())
         layout_row.addWidget(gb_preview)
-        self.preview = Previewer(self.image_source, self.preprocessor, True, -1)
-        #TODO connect
-        gb_preview.layout().addWidget(self.preview)
-        # self.combo_image_selection = QComboBox()
-        # #TODO populate
-        # self.combo_image_selection.activated.connect(self.onImageSelectionChanged)
         
-        # gb_preview.layout().addWidget(self.combo_image_selection)
+        image_selection = ImageComboboxWidget(self.image_source)
+        gb_preview.layout().addWidget(image_selection)
+        self.preview = Previewer(self.preprocessor, self.preproc_step + 1)
+        image_selection.imageSelectionChanged.connect(self.preview.onImageSelectionChanged)
+        # Populate current image
+        self.preview.onImageSelectionChanged(*image_selection.getImageSelection())
 
-        # self.preview = ImageViewer()
-        # gb_preview.layout().addWidget(self.preview)
+        gb_preview.layout().addWidget(self.preview)
 
         # Accept/reject buttons at the bottom
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
         layout_main.addWidget(btn_box)
-
-    # @Slot(int)
-    # def onImageSelectionChanged(self, index):
-    #     print('TODO image changed')
-    #     pass
 
     @Slot()
     def onConfigurationUpdated(self):
