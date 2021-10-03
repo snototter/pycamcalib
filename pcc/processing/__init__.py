@@ -1,2 +1,2 @@
-from .image_source import ImageDirectorySource, DirectoryNotFoundError, NoImageDirectoryError
+from .image_source import ImageSource, DirectoryNotFoundError, NoImageDirectoryError
 from .preprocessing import *

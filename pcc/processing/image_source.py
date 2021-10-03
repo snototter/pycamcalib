@@ -22,7 +22,7 @@ class NoImageDirectoryError(Exception):
     pass
 
 
-class ImageDirectorySource(object):
+class ImageSource(object):
     """Allows iterating all images of a local directory in sorted order."""
     def __init__(self, folder):
         if not os.path.exists(folder):

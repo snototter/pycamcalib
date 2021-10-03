@@ -6,11 +6,11 @@ import sys
 import time
 import traceback
 from PySide2 import QtWidgets
-from PySide2.QtCore import Qt, Slot
+from PySide2.QtCore import Qt, Signal, Slot
 from PySide2.QtWidgets import QApplication, QDesktopWidget, QGridLayout, QGroupBox, QHBoxLayout, QMainWindow, QProgressBar, QSizePolicy, QSplitter, QStatusBar, QStyleFactory, QToolBar, QVBoxLayout, QWidget
 from numpy import disp
 
-from ..processing import ImageDirectorySource, NoImageDirectoryError, DirectoryNotFoundError
+from ..processing import ImageSource, NoImageDirectoryError, DirectoryNotFoundError
 from .widgets import displayError, CalibrationInputWidget, PreprocessingSelector
 import logging
 
@@ -30,6 +30,11 @@ _logger = logging.getLogger('MonoCalibrationGui')
 #  also https://discourse.techart.online/t/pyqt-collapsible-groupbox-or-layout/1108/2
 
 class MonoCalibrationGui(QMainWindow):
+    # Emitted whenever an image source has been selected (or changed)
+    imageSourceChanged = Signal(ImageSource)
+
+    #TODO add calibrationPatternChanged, preprocessingPipelineChanged
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle('Monocular Calibration')
@@ -57,6 +62,7 @@ class MonoCalibrationGui(QMainWindow):
     #     pass
     
     def _initLayout(self):
+        #TODO connect ImageSource(folder)
         layout_main = QVBoxLayout()
         splitter_main = QSplitter(Qt.Vertical)
         layout_main.addWidget(splitter_main)
@@ -116,9 +122,12 @@ class MonoCalibrationGui(QMainWindow):
     def _folderSelected(self, folder):
         _logger.info(f'Loading images from {folder}')
         try:
-            src = ImageDirectorySource(folder)
+            self.image_source = ImageSource(folder)
+            # Notify observers of new/changed image data
+            self.imageSourceChanged.emit(self.image_source)
             self.groupbox_imgview.setEnabled(True) #TODO reset, then populate with images
 
+            #TODO remove
             import time
             self.progress_bar.setVisible(True)
             self.status_bar.showMessage(f'Loading {src.num_images()} images from {folder}')

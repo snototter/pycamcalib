@@ -233,12 +233,14 @@ applied subsequently to a given image via 'process()'.
         """Remove operation at index"""
         del self.operations[index]
 
-    def process(self, image):
-        i = 0
-        for op in self.operations:
+    def apply(self, image: np.ndarray, num_steps: int = -1):
+        """Applies the configured operations subsequently to the given image.
+        If num_steps <= 0, all operations are applied. Otherwise, only the first
+        num_steps will be applied."""
+        for step, op in enumerate(self.operations):
+            if num_steps >= 0 and step >= num_steps:
+                break
             image = op.apply(image)
-            imvis.imshow(image, f'prepoc step #{i}', wait_ms=10)
-            i+=1
         return image
 
     def freeze(self):

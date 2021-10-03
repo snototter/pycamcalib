@@ -7,7 +7,7 @@ from PySide2.QtGui import QIcon, QPalette
 from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSizePolicy, QSpacerItem, QToolButton, QVBoxLayout, QWidget
 
 from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrection, PreProcOpGrayscale, PreProcOpHistEq #TODO remove
-from ...processing import ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
+from ...processing import ImageSource, ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
 from .common import HorizontalLine, displayError, ignoreMessageCallback
 from .preprocessing_configs import PreProcOpConfigDialog
 
@@ -312,3 +312,8 @@ class PreprocessingSelector(QWidget):
                 filename += '.toml'
             self.preprocessor.saveTOML(filename)
             self.showMessage(f'Preprocessing pipeline has been saved to {filename}', 10000)
+
+    @Slot(ImageSource)
+    def onImageSourceChanged(self, image_source: ImageSource):
+        print(f'TODO Image source changed, have to load {image_source.num_images()} images')
+        #TODO emit signal here to notify list items; update preview
