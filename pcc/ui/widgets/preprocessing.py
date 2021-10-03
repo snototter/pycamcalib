@@ -213,7 +213,7 @@ class PreprocessingSelector(QWidget):
         layout_controls.addWidget(btn_load)
 
         self._btn_save = QPushButton(' Save')
-        self._btn_save.setIcon(QIcon.fromTheme('document-open'))
+        self._btn_save.setIcon(QIcon.fromTheme('document-save'))
         self._btn_save.setIconSize(icon_size)
         self._btn_save.setToolTip('Save Preprocessing Pipeline')
         self._btn_save.setMinimumHeight(icon_size.height() + 6)
@@ -233,10 +233,13 @@ class PreprocessingSelector(QWidget):
         layout_left.addWidget(self.list_widget)
 
         # 2nd column shows the preview
+        # layout_right = QVBoxLayout()
+        # layout_main.addLayout(layout_right)
         self.preview = Previewer(self.image_source, self.preprocessor, True, -1)
         self._imageSourceChanged.connect(self.preview.onImageSourceChanged)
         self.preprocessorChanged.connect(self.preview.onPreprocessorChanged)
         layout_main.addWidget(self.preview)
+        # layout_right.addWidget(self.preview)
 
     def _updateList(self):
         # Add all currently configured operations

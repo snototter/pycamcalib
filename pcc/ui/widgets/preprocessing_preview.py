@@ -1,12 +1,13 @@
 import os
-from PySide2.QtCore import Slot
+from PySide2.QtCore import Qt, Slot
 from .image_view import ImageViewer
-from PySide2.QtWidgets import QComboBox, QVBoxLayout, QWidget
+from PySide2.QtWidgets import QComboBox, QGridLayout, QSizePolicy, QVBoxLayout, QWidget
 
 from ...processing import ImageSource, Preprocessor
 
-#TODO implement preprocessing pipeline logic (apply upon selecting a new image)
 #TODO 03.10. layout preview (top alignment??)
+#TODO 04.10. add step slider
+
 
 class Previewer(QWidget):
     def __init__(self, image_source: ImageSource, preprocessor: Preprocessor,
@@ -37,6 +38,8 @@ class Previewer(QWidget):
         self.setLayout(layout_main)
 
         self.combo_image_selection = QComboBox()
+        self.combo_image_selection.setMinimumHeight(26)
+        self.combo_image_selection.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.combo_image_selection.currentIndexChanged.connect(self._onImageSelectionChanged)
         layout_main.addWidget(self.combo_image_selection)
 
@@ -44,9 +47,12 @@ class Previewer(QWidget):
             print('TODO TODO TODO step selection slider still missing!')
 
         self.preview = ImageViewer()
+        self.preview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout_main.addWidget(self.preview)
+
         
         self.setEnabled(self.image_source is not None and self.preprocessor is not None)
+
     
     def _updateImageList(self):
         self.combo_image_selection.clear()

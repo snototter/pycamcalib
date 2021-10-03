@@ -135,7 +135,7 @@ class MonoCalibrationGui(QMainWindow):
 
             #TODO remove
             import time
-            #TODO hide progress bar after completion (timed!), see https://stackoverflow.com/a/61885754
+            #TODO 03.10 hide progress bar after completion (timed!), see https://stackoverflow.com/a/61885754
             self.progress_bar.setVisible(True)
             self.status_bar.showMessage(f'Loading {self.image_source.num_images()} images from {folder}')
             for i in range(self.image_source.num_images()):
