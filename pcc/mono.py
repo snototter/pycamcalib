@@ -158,6 +158,7 @@ def globalExceptionHook(excType, excValue, tracebackobj):
     errmsg = f'{excType}:\n{str(excValue)}'
 
     sections = [separator, timestr, separator, errmsg, separator, tbinfo]
+    _logger.error('Unhandled exception:\n' + '\n'.join(sections))
     displayError('An unhandled exception occurred. Please report the problem.',
                  title='Unhandled Exception',
                  informative_text='<pre>' + html.escape('\n'.join(sections)) + '</pre>')
