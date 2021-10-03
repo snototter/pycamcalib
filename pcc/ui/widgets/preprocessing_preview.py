@@ -3,11 +3,78 @@ from typing import Tuple
 from PySide2.QtCore import Qt, Signal, Slot
 import numpy as np
 from .image_view import ImageViewer
-from PySide2.QtWidgets import QComboBox, QGridLayout, QSizePolicy, QVBoxLayout, QWidget
+from PySide2.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QLabel, QSizePolicy, QSlider, QVBoxLayout, QWidget
 
 from ...processing import ImageSource, Preprocessor
 
-#TODO 04.10. add step slider
+#TODO 04.10. adapt step slider (simply copied from iminspect)
+class SliderWidget(QWidget):
+    """Copied from iminspect.inputs"""
+
+    valueChanged = Signal(object)
+    #FIXME 04.10 check if pyside manages to convert numeric object to int
+    # otherwise, we introduce intValueChanged and floatValueChanged
+
+    def __init__(self, label, min_value=0, max_value=100, num_steps=10,
+            initial_value=None,
+            value_convert_fx=lambda v: int(v), # Type conversion (internally this slider uses floats)
+            value_format_fx=lambda v: f'{v:4d}', # Maps slider value => string
+            min_label_width=None, parent=None):
+        super().__init__(parent)
+        self._min_value = min_value
+        self._max_value = max_value
+        self._num_steps = num_steps
+        self._step_size = (max_value - min_value) / num_steps
+        self._value_format_fx = value_format_fx
+        self._value_convert_fx = value_convert_fx
+
+        layout = QHBoxLayout()
+        lbl = QLabel(label)
+        if min_label_width is not None:
+            lbl.setMinimumWidth(min_label_width)
+        layout.addWidget(lbl)
+
+        self._slider = QSlider(Qt.Horizontal)
+        self._slider.setMinimum(0)
+        self._slider.setMaximum(num_steps)
+        self._slider.setTickPosition(QSlider.TicksBelow)
+        self._slider.valueChanged.connect(self._onValueChanged)
+        layout.addWidget(self._slider)
+
+        self._slider_label = QLabel(' ')
+        layout.addWidget(self._slider_label)
+
+        # Set label to maximum value, so we can fix the width
+        self._slider_label.setText(value_format_fx(max_value))
+        self._slider_label.setFixedWidth(self._slider_label.sizeHint().width())
+
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+
+        if initial_value is None:
+            self._slider.setValue(self._toSliderValue(min_value))
+        else:
+            self._slider.setValue(self._toSliderValue(initial_value))
+        self._onValueChanged()
+
+    def _toSliderValue(self, value):
+        v = round((value - self._min_value)/self._step_size)
+        return v
+
+    def _sliderValue(self):
+        v = self._slider.value()
+        v = self._min_value + v * self._step_size
+        return self._value_convert_fx(v)
+
+    def _onValueChanged(self):
+        val = self._sliderValue()
+        self._slider_label.setText(self._value_format_fx(val))
+        self.valueChanged.emit(val)
+
+    def setValue(self, v):
+        self._slider.setValue(self._toSliderValue(v))
+        self._onValueChanged()
+
 
 class ImageComboboxWidget(QComboBox):
     """A combobox which lists the currently loaded image filenames and emits
@@ -69,6 +136,7 @@ class Previewer(QWidget):
         self.setLayout(layout_main)
         self.preview = ImageViewer()
         layout_main.addWidget(self.preview)
+        layout_main.setContentsMargins(0, 0, 0, 0)
         self.setEnabled(self.preprocessor is not None)
 
     def resizeEvent(self, event):

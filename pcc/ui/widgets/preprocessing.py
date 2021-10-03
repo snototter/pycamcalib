@@ -11,7 +11,7 @@ from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrectio
 from ...processing import ImageSource, ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
 from .common import HorizontalLine, displayError, ignoreMessageCallback
 from .preprocessing_configs import PreProcOpConfigDialog
-from .preprocessing_preview import Previewer, ImageComboboxWidget
+from .preprocessing_preview import Previewer, ImageComboboxWidget, SliderWidget
 
 
 _logger = logging.getLogger('PreprocessingUI')
@@ -194,9 +194,9 @@ class PreprocessingSelector(QWidget):
 
     def _initLayout(self, icon_size):
         layout_main = QGridLayout()
+        self.setLayout(layout_main)
         ## 1st row: load/save + image selection
         layout_controls = QHBoxLayout()
-        # layout_left.addLayout(layout_controls)
         layout_main.addLayout(layout_controls, 0, 0, 1, 1)
 
         btn_load = QPushButton(' Load')
@@ -233,19 +233,22 @@ class PreprocessingSelector(QWidget):
         # layout_left.addWidget(self.list_widget)
         layout_main.addWidget(self.list_widget, 1, 0, 2, 1)
 
-        layout_main.addWidget(QLabel('TODO step slider'), 1, 1, 1, 1)
+        step_slider = SliderWidget('Preproc. Steps:', 1, self.preprocessor.num_operations(), self.preprocessor.num_operations()-1)
+        #FIXME make separate preproc slider: a) range must be adjustable b) disable if preproc is none
+        layout_main.addWidget(step_slider, 1, 1, 1, 1)
 
         # Preview
         self.preview = Previewer(self.preprocessor, -1)
         self.preprocessorChanged.connect(self.preview.onPreprocessorChanged)
         image_selection.imageSelectionChanged.connect(self.preview.onImageSelectionChanged)
-        # layout_main.addWidget(self.preview)
+        step_slider.valueChanged.connect(self.preview.onStepChanged)
+        # step_slider.intValueChanged.connect(self.preview.onStepChanged)#FIXME 04.10 see comments in SliderWidget
+
         layout_main.addWidget(self.preview, 2, 1, 1, 1)
-        # layout_right.addWidget(self.preview)
+        
         layout_main.setRowStretch(2, 10)
         layout_main.setColumnStretch(0, 3)
         layout_main.setColumnStretch(1, 2)
-        self.setLayout(layout_main)
 
     def _updateList(self):
         # Add all currently configured operations
