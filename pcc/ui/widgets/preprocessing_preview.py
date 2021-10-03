@@ -5,6 +5,9 @@ from PySide2.QtWidgets import QComboBox, QVBoxLayout, QWidget
 
 from ...processing import ImageSource, Preprocessor
 
+#TODO implement preprocessing pipeline logic (apply upon selecting a new image)
+#TODO 03.10. layout preview (top alignment??)
+
 class Previewer(QWidget):
     def __init__(self, image_source: ImageSource, preprocessor: Preprocessor,
                  with_step_slider: bool = False, current_step: int = -1, parent=None):
@@ -22,6 +25,11 @@ class Previewer(QWidget):
         self.with_step_slider = with_step_slider
         self.current_step = current_step
         self._initLayout()
+        # If we only scale the image within the viewer upon construction, it 
+        # might show at a wrong scale (because the window may be resized 
+        # afterwards, e.g. when we show it in an PreproOperation's config
+        # dialog). Thus, we'll scale to fit upon the first resizeEvent
+        self._delay_preview_scale_to_fit = True
         self._updateImageList()
     
     def _initLayout(self):
@@ -48,11 +56,22 @@ class Previewer(QWidget):
         if self.combo_image_selection.count() > 0:
             self.combo_image_selection.setCurrentIndex(0)
 
+    def resizeEvent(self, event):
+        if self._delay_preview_scale_to_fit and self.combo_image_selection.count() > 0:
+            # At the first resizeEvent after construction, we need to scale the
+            # image viewer to properly "fit to window" (if we already have an
+            # image selected)
+            self._delay_preview_scale_to_fit = False
+            self.preview.scaleToFitWindow()
+
     @Slot(int)
     def _onImageSelectionChanged(self, index):
-        self.preview.showImage(self.image_source[index], reset_scale=True)
+        image = self.image_source[index]
+        if self.preprocessor is not None:
+            image = self.preprocessor.apply(image, self.current_step)
+        self.preview.showImage(image, reset_scale=True)
         self.preview.scaleToFitWindow()
-    
+
     @Slot(ImageSource)
     def onImageSourceChanged(self, image_source: ImageSource):
         self.image_source = image_source
@@ -63,3 +82,5 @@ class Previewer(QWidget):
     def onPreprocessorChanged(self, preprocessor: Preprocessor):
         self.preprocessor = preprocessor
         self.setEnabled(self.image_source is not None and self.preprocessor is not None)
+        if self.image_source is not None:
+            self._onImageSelectionChanged(self.combo_image_selection.currentIndex())

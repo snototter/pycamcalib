@@ -235,7 +235,7 @@ class PreprocessingSelector(QWidget):
         # 2nd column shows the preview
         self.preview = Previewer(self.image_source, self.preprocessor, True, -1)
         self._imageSourceChanged.connect(self.preview.onImageSourceChanged)
-        #TODO 03.10 connect imgsrc changed, preproc changed
+        self.preprocessorChanged.connect(self.preview.onPreprocessorChanged)
         layout_main.addWidget(self.preview)
 
     def _updateList(self):
