@@ -21,6 +21,7 @@ class GammaCorrectionConfigWidget(QWidget):
         layout_main = QVBoxLayout()
         self.setLayout(layout_main)
         self.gamma_widget = ValidatedFloatInputWidget('Gamma:', self.operation.gamma, 0.01, 30, 2)
+        self.gamma_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.gamma_widget)
 
         button = QPushButton('Apply')
