@@ -10,7 +10,7 @@ from PySide2.QtCore import Qt, Signal, Slot
 from PySide2.QtWidgets import QApplication, QDesktopWidget, QGridLayout, QGroupBox, QHBoxLayout, QMainWindow, QProgressBar, QSizePolicy, QSplitter, QStatusBar, QStyleFactory, QToolBar, QVBoxLayout, QWidget
 from numpy import disp
 
-from ..processing import ImageSource, NoImageDirectoryError, DirectoryNotFoundError
+from ..processing import ImageSource, NoImageDirectoryError, DirectoryNotFoundError, Preprocessor
 from .widgets import displayError, CalibrationInputWidget, PreprocessingSelector
 import logging
 
@@ -31,9 +31,13 @@ _logger = logging.getLogger('MonoCalibrationGui')
 
 class MonoCalibrationGui(QMainWindow):
     # Emitted whenever an image source has been selected (or changed)
-    imageSourceChanged = Signal(ImageSource)
+    #TODO connect to calibration widget
+    _imageSourceChanged = Signal(ImageSource)
 
-    #TODO add calibrationPatternChanged, preprocessingPipelineChanged
+    # TODO not needed! connect the preprocConfigSelector's signal to calibWidget's slot!
+    # _preprocessorChanged = Signal(Preprocessor)
+
+    #TODO add calibrationPatternChanged
 
     def __init__(self):
         super().__init__()
@@ -41,6 +45,7 @@ class MonoCalibrationGui(QMainWindow):
 
         self.image_source = None
         self.calibration_pattern = None
+        self.preprocessor = None
 
         # self.createActions()
         # self.createMenuBar()
@@ -62,7 +67,6 @@ class MonoCalibrationGui(QMainWindow):
     #     pass
     
     def _initLayout(self):
-        #TODO connect ImageSource(folder)
         layout_main = QVBoxLayout()
         splitter_main = QSplitter(Qt.Vertical)
         layout_main.addWidget(splitter_main)
@@ -78,22 +82,25 @@ class MonoCalibrationGui(QMainWindow):
         splitter_row1.addWidget(groupbox_input)
 
         self.calib_input = CalibrationInputWidget()
-        self.calib_input.imageFolderSelected.connect(self._folderSelected)
-        self.calib_input.patternConfigurationChanged.connect(self._patternConfigChanged)
+        self.calib_input.imageFolderSelected.connect(self.onFolderSelected)
+        self.calib_input.patternConfigurationChanged.connect(self.onPatternConfigChanged)
         self.calib_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         groupbox_input.layout().addWidget(self.calib_input)
 
         #### Preprocessing pipeline
         groupbox_preproc = QGroupBox("Preprocessing")
         groupbox_preproc.setLayout(QVBoxLayout())
-        self.preproc_configurator = PreprocessingSelector(message_callback=self.status_bar.showMessage)
+        self.preproc_configurator = PreprocessingSelector(self.image_source, message_callback=self.status_bar.showMessage)
         self.preproc_configurator.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._imageSourceChanged.connect(self.preproc_configurator.onImageSourceChanged)
         groupbox_preproc.layout().addWidget(self.preproc_configurator)
         splitter_row1.addWidget(groupbox_preproc)
 
         # splitter_row1.setSizes([4, 5])
         
         ########### 2nd row (image gallery)
+        #TODO connect _imageSourceChanged, preproc_config.preprocpipelineChanged
+        # self.preproc_configurator.preprocessorChanged.connect(self.onPreprocessorChanged)
         self.groupbox_imgview = QGroupBox("Images")
         self.groupbox_imgview.setLayout(QVBoxLayout())
         self.groupbox_imgview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -119,33 +126,39 @@ class MonoCalibrationGui(QMainWindow):
         self.status_bar.addPermanentWidget(self.progress_bar)
 
     @Slot(str)
-    def _folderSelected(self, folder):
+    def onFolderSelected(self, folder):
         _logger.info(f'Loading images from {folder}')
         try:
             self.image_source = ImageSource(folder)
             # Notify observers of new/changed image data
-            self.imageSourceChanged.emit(self.image_source)
             self.groupbox_imgview.setEnabled(True) #TODO reset, then populate with images
 
             #TODO remove
             import time
             self.progress_bar.setVisible(True)
-            self.status_bar.showMessage(f'Loading {src.num_images()} images from {folder}')
-            for i in range(src.num_images()):
-                prg = int((i+1) / src.num_images() * 100)
+            self.status_bar.showMessage(f'Loading {self.image_source.num_images()} images from {folder}')
+            for i in range(self.image_source.num_images()):
+                prg = int((i+1) / self.image_source.num_images() * 100)
                 self.progress_bar.setValue(prg)
                 time.sleep(0.1)
-            self.status_bar.showMessage(f'Loaded {src.num_images()} images from {folder}', 10000)
+            self.status_bar.showMessage(f'Loaded {self.image_source.num_images()} images from {folder}', 10000)
         except (DirectoryNotFoundError, NoImageDirectoryError) as e:
             _logger.error("Error while loading image files:", exc_info=e)
             self.status_bar.showMessage(f'Error while loading images from {folder} ({e.__class__.__name__})', 10000)
             displayError(f"Error while loading images.", informative_text=str(e), parent=self)
+            self.image_source = None
             self.calib_input.resetImageFolder()
-            #TODO self reset
+        self._imageSourceChanged.emit(self.image_source)
+            #TODO self reset (calibwidget)
     
     @Slot()
-    def _patternConfigChanged(self):
+    def onPatternConfigChanged(self):
         print('TODO pattern config changed')
+
+    @Slot(Preprocessor)
+    def onPreprocessorChanged(self, preprocessor: Preprocessor):
+        _logger.info('TODO preprocessor changed')
+        self.preprocessor = preprocessor
 
 
 def globalExceptionHook(excType, excValue, tracebackobj):

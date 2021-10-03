@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import pathlib
+from PIL.Image import Image
 from PySide2.QtCore import QSize, Qt, Signal, Slot
 from PySide2.QtGui import QIcon, QPalette
 from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSizePolicy, QSpacerItem, QToolButton, QVBoxLayout, QWidget
@@ -10,6 +11,7 @@ from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrectio
 from ...processing import ImageSource, ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
 from .common import HorizontalLine, displayError, ignoreMessageCallback
 from .preprocessing_configs import PreProcOpConfigDialog
+from .preprocessing_preview import Previewer
 
 #TODO tasks:
 # * save TOML
@@ -41,8 +43,12 @@ class OperationItem(QWidget):
     remove = Signal(int)
     configurationChanged = Signal(int)
 
-    def __init__(self, operation, list_index, number_operations, parent=None):
+    def __init__(self, image_source: ImageSource, preprocessor: Preprocessor,
+                 operation: PreProcOperationBase, list_index: int,
+                 number_operations: int, parent=None):
         super().__init__(parent)
+        self.image_source = image_source
+        self.preprocessor = preprocessor
         self.operation = operation
         self.list_index = list_index
         layout = QHBoxLayout()
@@ -96,7 +102,8 @@ class OperationItem(QWidget):
     def _configure(self):
         #TODO how to pass input image from the selector's preprocessor instance to this list item? (callback to retrieve the latest image?)
         # preprocessor must support running the pipeline only partially
-        dlg = PreProcOpConfigDialog(self.operation, None, self)
+        dlg = PreProcOpConfigDialog(self.image_source, self.preprocessor,
+                                    self.operation, self)
         if dlg.exec_():
             # Check if the parameters actually differ:
             if dlg.hasConfigurationChanged():
@@ -107,6 +114,15 @@ class OperationItem(QWidget):
     def update(self):
         self.label.setText(self.operation.description())
         return super().update()
+
+    @Slot(ImageSource)
+    def onImageSourceChanged(self, image_source: ImageSource):
+        self.image_source = image_source
+
+    @Slot(Preprocessor)
+    def onPreprocessorChanged(self, preprocessor: Preprocessor):
+        self.preprocessor = preprocessor
+
 
 class AddOperationItem(QWidget):
     """Special list item which allows adding another preprocessing operation"""
@@ -147,15 +163,17 @@ class AddOperationItem(QWidget):
 
 
 class PreprocessingSelector(QWidget):
-    """Two-column widget to configure & preview the preprocessing pipeline.
-    TODO if images are available, they must be populated to slot X
-    """
+    """Two-column widget to configure & preview the preprocessing pipeline."""
+    preprocessorChanged = Signal(Preprocessor)
+    _imageSourceChanged = Signal(ImageSource)
 
-    def __init__(self, message_callback=ignoreMessageCallback, icon_size=QSize(20, 20), parent=None):
+    def __init__(self, image_source, message_callback=ignoreMessageCallback, icon_size=QSize(20, 20), parent=None):
         super().__init__(parent)
+        self.image_source = image_source
         # We always start with grayscale conversion
         self.preprocessor = Preprocessor()
         self.preprocessor.add_operation(PreProcOpGrayscale())
+        self.preprocessorChanged.emit(self.preprocessor)
         # Supported file filters for loading/saving:
         self._file_filters = ["All Files (*.*)", "TOML (*.toml)"]
         self._file_filter_preferred_idx = 1
@@ -178,10 +196,13 @@ class PreprocessingSelector(QWidget):
         self._updateList()
 
     def _initLayout(self, icon_size):
-        layout_main = QVBoxLayout()
+        layout_main = QHBoxLayout()
+        self.setLayout(layout_main)
+        layout_left = QVBoxLayout()
+        layout_main.addLayout(layout_left)
         # 1st row: load/save
         layout_controls = QHBoxLayout()
-        layout_main.addLayout(layout_controls)
+        layout_left.addLayout(layout_controls)
 
         btn_load = QPushButton(' Load')
         btn_load.setIcon(QIcon.fromTheme('document-open'))
@@ -199,6 +220,7 @@ class PreprocessingSelector(QWidget):
         self._btn_save.clicked.connect(self.onSavePipeline)
         layout_controls.addWidget(self._btn_save)
 
+        # 2nd row contains the list widget
         self.list_widget = QListWidget()
         # Disable selection/highlighting:
         self.list_widget.setSelectionMode(QAbstractItemView.NoSelection)
@@ -208,19 +230,27 @@ class PreprocessingSelector(QWidget):
         self.list_widget.setPalette(palette)
         # self.list_widget.setAlternatingRowColors(True) #Doesn't work
         # self.list_widget.setStyleSheet("alternate-background-color: white; background-color: blue;")
-        layout_main.addWidget(self.list_widget)
-        self.setLayout(layout_main)
-    
-    def _updateList(self):
-        self.list_widget.clear()
+        layout_left.addWidget(self.list_widget)
 
+        # 2nd column shows the preview
+        self.preview = Previewer(self.image_source, self.preprocessor, True, -1)
+        self._imageSourceChanged.connect(self.preview.onImageSourceChanged)
+        #TODO 03.10 connect imgsrc changed, preproc changed
+        layout_main.addWidget(self.preview)
+
+    def _updateList(self):
+        # Add all currently configured operations
+        self.list_widget.clear()
         for idx, op in enumerate(self.preprocessor.operations):
             # Add a default item
             item = QListWidgetItem()
             self.list_widget.addItem(item)
             # Initialize the operation item widget
-            item_widget = OperationItem(op, idx, len(self.preprocessor.operations))
+            item_widget = OperationItem(self.image_source, self.preprocessor,
+                                        op, idx, self.preprocessor.num_operations())
             item_widget.configurationChanged.connect(self.onOperationConfigurationHasChanged)
+            self.preprocessorChanged.connect(item_widget.onPreprocessorChanged)
+            self._imageSourceChanged.connect(item_widget.onImageSourceChanged)
             item_widget.moveUp.connect(self.onMoveUp)
             item_widget.moveDown.connect(self.onMoveDown)
             item_widget.toggled.connect(self.onOperationCheckboxToggled)
@@ -237,12 +267,13 @@ class PreprocessingSelector(QWidget):
         self.list_widget.setItemWidget(item, item_widget)
 
         # Enable/disable save button depending on configured pipeline
-        self._btn_save.setEnabled(len(self.preprocessor.operations) > 0)
+        self._btn_save.setEnabled(self.preprocessor.num_operations() > 0)
 
     @Slot(int)
     def onMoveUp(self, op_idx):
         # User wants to change the order of operations
         self.preprocessor.swap_previous(op_idx)
+        self.preprocessorChanged.emit(self.preprocessor)
         # Rebuilding the list is easier (takeItem/insertItem needs further
         # investigation, because of the custom ItemWidget - additionally,
         # we would need to adjust all ItemWidget's indices accordingly...)
@@ -254,27 +285,32 @@ class PreprocessingSelector(QWidget):
     def onMoveDown(self, op_idx):
         # User wants to change the order of operations
         self.preprocessor.swap_next(op_idx)
+        self.preprocessorChanged.emit(self.preprocessor)
         self._updateList()
 
     @Slot(int)
     def onRemove(self, op_idx):
         # User wants to remove an operation
         self.preprocessor.remove(op_idx)
+        self.preprocessorChanged.emit(self.preprocessor)
         self._updateList()
 
     @Slot(int, bool)
     def onOperationCheckboxToggled(self, op_idx, enabled):
         # Checkbox enabled/disabled has been toggled
         self.preprocessor.set_enabled(op_idx, enabled)
+        self.preprocessorChanged.emit(self.preprocessor)
 
     @Slot(PreProcOperationBase)
     def onAddOperation(self, operation):
         # User wants to add another operation to the pipeline
         self.preprocessor.add_operation(operation)
+        self.preprocessorChanged.emit(self.preprocessor)
         self._updateList()
 
     @Slot(int)
     def onOperationConfigurationHasChanged(self, _):
+        self.preprocessorChanged.emit(self.preprocessor)
         self._updateList()
 
     @Slot()
@@ -289,6 +325,7 @@ class PreprocessingSelector(QWidget):
             self._previously_selected_folder = os.path.dirname(filename)
             try:
                 self.preprocessor.loadTOML(filename)
+                self.preprocessorChanged.emit(self.preprocessor)
                 self.showMessage(f'Preprocessing pipeline has been loaded from {filename}', 10000)
             except (FileNotFoundError, ConfigurationError) as e:
                 _logger.error("Error while loading TOML preprocessor configuration:", exc_info=e)
@@ -315,5 +352,6 @@ class PreprocessingSelector(QWidget):
 
     @Slot(ImageSource)
     def onImageSourceChanged(self, image_source: ImageSource):
-        print(f'TODO Image source changed, have to load {image_source.num_images()} images')
         #TODO emit signal here to notify list items; update preview
+        self._imageSourceChanged.emit(image_source)
+        #TODO update preview

@@ -364,7 +364,7 @@ class ImageViewer(QScrollArea):
         self._viewer_type = viewer_type
         self._prepareLayout(**kwargs)
 
-    def imageNumPy(self):
+    def imageNumpy(self):
         """Returns the shown image as numpy ndarray."""
         return self._img_np()
 

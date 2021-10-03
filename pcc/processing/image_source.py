@@ -24,7 +24,7 @@ class NoImageDirectoryError(Exception):
 
 class ImageSource(object):
     """Allows iterating all images of a local directory in sorted order."""
-    def __init__(self, folder):
+    def __init__(self, folder, preload_images=False):
         if not os.path.exists(folder):
             raise DirectoryNotFoundError(f"No such folder '{folder}'")
         self.folder = folder
@@ -32,6 +32,8 @@ class ImageSource(object):
         self.idx = 0
         if len(self.files) == 0:
             raise NoImageDirectoryError(f"No image files in folder '{folder}'")
+        # Load all images into memory if requested
+        self.images = None if not preload_images else self.load_all()
 
     def is_available(self) -> bool:
         """Returns True if there is a file not yet accessed via next()."""
@@ -53,7 +55,11 @@ class ImageSource(object):
         """Returns a list of all (basename) image names within the folder."""
         return self.files
 
-    def images(self):
-        """Returns a list of all images."""
-        # TODO future extension: check memory usage (maybe it's useful to cache the images)
-        return [imutils.imread(os.path.join(self.folder, self.files[i])) for i in range(len(self.files))]
+    def load_all(self):
+        return [imutils.imread(os.path.join(self.folder, self.files[i]))
+                for i in range(len(self.files))]
+
+    def __getitem__(self, index: int):
+        if self.images is None:
+            self.images = self.load_all()
+        return self.images[index]

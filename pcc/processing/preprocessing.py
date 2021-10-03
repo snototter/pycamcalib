@@ -280,7 +280,7 @@ applied subsequently to a given image via 'process()'.
             raise ConfigurationError(f"Invalid TOML configuration: {e}") from None
 
 
-#TODO clean up or remove
+#TODO remove (potential cyclic imports)
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     # op_map = generate_operation_mapping()
