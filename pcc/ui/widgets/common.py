@@ -25,11 +25,18 @@ def ignoreMessageCallback(text: str, timeout: int = 0):
     pass
 
 
-class HLine(QFrame):
+class HorizontalLine(QFrame):
     """A horizontal line (divider)."""
     def __init__(self, parent=None):
-        super(HLine, self).__init__(parent)
+        super().__init__(parent)
         self.setFrameShape(QFrame.HLine)
+        self.setFrameShadow(QFrame.Sunken)
+
+class VerticalLine(QFrame):
+    """A horizontal line (divider)."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFrameShape(QFrame.VLine)
         self.setFrameShadow(QFrame.Sunken)
 
 

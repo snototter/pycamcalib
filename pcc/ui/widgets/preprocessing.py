@@ -8,7 +8,7 @@ from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QFileDial
 
 from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrection, PreProcOpGrayscale, PreProcOpHistEq #TODO remove
 from ...processing import ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
-from .common import HLine, displayError, ignoreMessageCallback
+from .common import HorizontalLine, displayError, ignoreMessageCallback
 from .preprocessing_configs import PreProcOpConfigDialog
 
 #TODO tasks:
@@ -98,14 +98,16 @@ class OperationItem(QWidget):
         # preprocessor must support running the pipeline only partially
         dlg = PreProcOpConfigDialog(self.operation, None, self)
         if dlg.exec_():
-#FIXME check if adjusting the parameters is persistent (within the preprocessor's list!)
-            print(f'TODO operation has been changed: {self.operation}')
-            self.configurationChanged.emit(self.list_index)
+            # Check if the parameters actually differ:
+            if dlg.hasConfigurationChanged():
+                print(f'TODO operation has been changed: {self.operation}') #TODO remove
+                self.configurationChanged.emit(self.list_index)
+            else:
+                print("CONFIGURATION HAS NOT CHANGED") # TODO remove
         else:
             dlg.restoreConfiguration()
 
     def update(self):
-        print('FUCK UPDATE!!!')
         self.label.setText(self.operation.description())
         return super().update()
 
@@ -119,7 +121,7 @@ class AddOperationItem(QWidget):
         layout_main = QVBoxLayout()
         # Add a horizontal divider between configured operations and this
         # special item
-        layout_main.addWidget(HLine())
+        layout_main.addWidget(HorizontalLine())
         layout_row = QHBoxLayout()
         # Placeholder to align with list items above it
         layout_row.addWidget(NumberLabel(None))

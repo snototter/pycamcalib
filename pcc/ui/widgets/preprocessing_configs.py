@@ -62,6 +62,13 @@ image which will be passed as input to the operation's 'apply()' method)."""
         """To be invoked by caller if the user cancelled this dialog."""
         self.operation.configure(self.initial_config)
 
+    def hasConfigurationChanged(self):
+        """Returns True if the operation's current configuration differs from
+        its initial configuration."""
+        if self.initial_config == self.operation.freeze():
+            return False
+        return True
+
     def _generateConfigWidgetMapping(self):
         # Create a mapping from PreProcOp.name (str) to its configuration widget
         self._config_widget_mapping = dict()
@@ -82,7 +89,8 @@ image which will be passed as input to the operation's 'apply()' method)."""
         wclass = self._config_widget_mapping[self.operation.name]
         config_widget = wclass(self.operation)
         gb_config.layout().addWidget(config_widget)
-        config_widget.configurationUpdated.connect(self._configurationUpdated) #TODO update preview
+        #config_widget.configurationUpdated.connect(self._configurationUpdated) #TODO update preview
+        gb_config.setFixedWidth(200)
 
         # 2nd column: preview
         gb_preview = QGroupBox("Preview")
