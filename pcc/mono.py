@@ -17,9 +17,11 @@ from .ui.widgets import displayError, CalibrationInputWidget, PreprocessingSelec
 import logging
 
 _logger = logging.getLogger('MonoCalibrationGui')
+#TODO consistency:
+# * Qt style in UI components
+# * slots: on<signal>
+# * snake_case in non UI submodules
 
-#TODO implement:
-# * global catch (for potentially unhandled exceptions) https://www.riverbankcomputing.com/pipermail/pyqt/2009-May/022961.html
 #TODO check:
 # not yet: https://realpython.com/python-menus-toolbars/
 # tabs: "input" "results" https://pythonspot.com/pyqt5-tabs/

@@ -100,10 +100,7 @@ class OperationItem(QWidget):
         if dlg.exec_():
             # Check if the parameters actually differ:
             if dlg.hasConfigurationChanged():
-                print(f'TODO operation has been changed: {self.operation}') #TODO remove
                 self.configurationChanged.emit(self.list_index)
-            else:
-                print("CONFIGURATION HAS NOT CHANGED") # TODO remove
         else:
             dlg.restoreConfiguration()
 
@@ -191,7 +188,7 @@ class PreprocessingSelector(QWidget):
         btn_load.setIconSize(icon_size)
         btn_load.setToolTip('Load Preprocessing Pipeline')
         btn_load.setMinimumHeight(icon_size.height() + 6)
-        btn_load.clicked.connect(self._loadPipeline)
+        btn_load.clicked.connect(self.onLoadPipeline)
         layout_controls.addWidget(btn_load)
 
         self._btn_save = QPushButton(' Save')
@@ -199,7 +196,7 @@ class PreprocessingSelector(QWidget):
         self._btn_save.setIconSize(icon_size)
         self._btn_save.setToolTip('Save Preprocessing Pipeline')
         self._btn_save.setMinimumHeight(icon_size.height() + 6)
-        self._btn_save.clicked.connect(self._savePipeline)
+        self._btn_save.clicked.connect(self.onSavePipeline)
         layout_controls.addWidget(self._btn_save)
 
         self.list_widget = QListWidget()
@@ -223,11 +220,11 @@ class PreprocessingSelector(QWidget):
             self.list_widget.addItem(item)
             # Initialize the operation item widget
             item_widget = OperationItem(op, idx, len(self.preprocessor.operations))
-            item_widget.configurationChanged.connect(self._operationConfigured)
-            item_widget.moveUp.connect(self._moveUp)
-            item_widget.moveDown.connect(self._moveDown)
-            item_widget.toggled.connect(self._operationToggled)
-            item_widget.remove.connect(self._remove)
+            item_widget.configurationChanged.connect(self.onOperationConfigurationHasChanged)
+            item_widget.moveUp.connect(self.onMoveUp)
+            item_widget.moveDown.connect(self.onMoveDown)
+            item_widget.toggled.connect(self.onOperationCheckboxToggled)
+            item_widget.remove.connect(self.onRemove)
             item.setSizeHint(item_widget.minimumSizeHint())
             self.list_widget.setItemWidget(item, item_widget)
 
@@ -235,7 +232,7 @@ class PreprocessingSelector(QWidget):
         item = QListWidgetItem()#self.list_widget)
         self.list_widget.addItem(item)
         item_widget = AddOperationItem()
-        item_widget.addOperation.connect(self._addOperation)
+        item_widget.addOperation.connect(self.onAddOperation)
         item.setSizeHint(item_widget.minimumSizeHint())
         self.list_widget.setItemWidget(item, item_widget)
 
@@ -243,7 +240,7 @@ class PreprocessingSelector(QWidget):
         self._btn_save.setEnabled(len(self.preprocessor.operations) > 0)
 
     @Slot(int)
-    def _moveUp(self, op_idx):
+    def onMoveUp(self, op_idx):
         # User wants to change the order of operations
         self.preprocessor.swap_previous(op_idx)
         # Rebuilding the list is easier (takeItem/insertItem needs further
@@ -254,34 +251,34 @@ class PreprocessingSelector(QWidget):
         # self.list_widget.insertItem(op_idx-1, item)
 
     @Slot(int)
-    def _moveDown(self, op_idx):
+    def onMoveDown(self, op_idx):
         # User wants to change the order of operations
         self.preprocessor.swap_next(op_idx)
         self._updateList()
 
     @Slot(int)
-    def _remove(self, op_idx):
+    def onRemove(self, op_idx):
         # User wants to remove an operation
         self.preprocessor.remove(op_idx)
         self._updateList()
 
     @Slot(int, bool)
-    def _operationToggled(self, op_idx, enabled):
+    def onOperationCheckboxToggled(self, op_idx, enabled):
         # Checkbox enabled/disabled has been toggled
         self.preprocessor.set_enabled(op_idx, enabled)
 
     @Slot(PreProcOperationBase)
-    def _addOperation(self, operation):
+    def onAddOperation(self, operation):
         # User wants to add another operation to the pipeline
         self.preprocessor.add_operation(operation)
         self._updateList()
 
     @Slot(int)
-    def _operationConfigured(self, _):
+    def onOperationConfigurationHasChanged(self, _):
         self._updateList()
 
     @Slot()
-    def _loadPipeline(self):
+    def onLoadPipeline(self):
         # Let the user select a TOML file. getOpenFileName also returns the applied file filter
         filename, _ = QFileDialog.getOpenFileName(self, 'Load Preprocessing Pipeline from TOML file',
                                                   self._previously_selected_folder,
@@ -303,7 +300,7 @@ class PreprocessingSelector(QWidget):
 
 
     @Slot()
-    def _savePipeline(self):
+    def onSavePipeline(self):
         # Let the user select the output (TOML) file. getSaveFileName also returns the applied file filter
         filename, _ = QFileDialog.getSaveFileName(self, 'Choose TOML file to save Preprocessing Pipeline',
                                                   self._previously_selected_folder,
