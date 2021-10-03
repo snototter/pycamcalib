@@ -213,27 +213,30 @@ applied subsequently to a given image via 'process()'.
         self.operations = list()
         self._operation_map = {opcls.name: opcls for opcls in AVAILABLE_PREPROCESSOR_OPERATIONS}
 
-    def add_operation(self, operation: PreProcOperationBase):
+    def num_operations(self) -> int:
+        return len(self.operations)
+
+    def add_operation(self, operation: PreProcOperationBase) -> None:
         _logger.info(f'Adding operation #{len(self.operations)}: {operation}')
         self.operations.append(operation)
 
-    def set_enabled(self, index: int, enabled: bool):
+    def set_enabled(self, index: int, enabled: bool) -> None:
         """Enable/disable the operation at the given index."""
         self.operations[index].set_enabled(enabled)
 
-    def swap_previous(self, index: int):
+    def swap_previous(self, index: int) -> None:
         """Swap operation at index with operation at index-1."""
         self.operations[index], self.operations[index-1] = self.operations[index-1], self.operations[index]
     
-    def swap_next(self, index: int):
+    def swap_next(self, index: int) -> None:
         """Swap operation at index with operation at index+1."""
         self.operations[index], self.operations[index+1] = self.operations[index+1], self.operations[index]
 
-    def remove(self, index: int):
+    def remove(self, index: int) -> None:
         """Remove operation at index"""
         del self.operations[index]
 
-    def apply(self, image: np.ndarray, num_steps: int = -1):
+    def apply(self, image: np.ndarray, num_steps: int = -1) -> np.ndarray:
         """Applies the configured operations subsequently to the given image.
         If num_steps <= 0, all operations are applied. Otherwise, only the first
         num_steps will be applied."""
@@ -243,7 +246,7 @@ applied subsequently to a given image via 'process()'.
             image = op.apply(image)
         return image
 
-    def freeze(self):
+    def freeze(self) -> dict:
         """Returns a dictionary which can be used to restore the current state
         of this preprocessing pipeline.
         Nested dict structure is intended to allow a) having a separate configuration
@@ -251,12 +254,12 @@ applied subsequently to a given image via 'process()'.
         """
         return {'preprocessing': {'operations': [op.freeze() for op in self.operations]}}
 
-    def saveTOML(self, filename):
+    def saveTOML(self, filename: str) -> None:
         """Stores the current state of this preprocessing pipeline to disk."""
         with open(filename, 'w') as fp:
             toml.dump(self.freeze(), fp)
 
-    def loadTOML(self, filename):
+    def loadTOML(self, filename: str) -> None:
         """Loads the preprocessing pipeline from the given TOML file.
         The operations must be configured as [[preprocessing.operations]]
         entries."""
@@ -294,10 +297,12 @@ if __name__ == '__main__':
     # pp.add_operation(PreProcOpGrayscale())
 
     imvis.imshow(img, wait_ms=10)
-    img1 = pp.process(img)
+    img1 = pp.apply(img)
 
     # pp.set_enabled(0, False)
-    img2 = pp.process(img)
+    for n in range(len(pp.operations)):
+        img2 = pp.apply(img, n)
+        imvis.imshow(img2, f'{n} steps', wait_ms=10)
 
     # imvis.imshow(img2, 'disabled?', wait_ms=-1)
-    imvis.imshow(img1, 'preproc', wait_ms=-1)
+    imvis.imshow(img1, 'all steps', wait_ms=-1)
