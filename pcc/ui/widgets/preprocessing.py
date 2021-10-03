@@ -243,6 +243,8 @@ class PreprocessingSelector(QWidget):
         layout_main.addWidget(self.preview, 2, 1, 1, 1)
         # layout_right.addWidget(self.preview)
         layout_main.setRowStretch(2, 10)
+        layout_main.setColumnStretch(0, 3)
+        layout_main.setColumnStretch(1, 2)
         self.setLayout(layout_main)
 
     def _updateList(self):

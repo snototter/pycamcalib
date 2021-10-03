@@ -6,7 +6,7 @@ import sys
 import time
 import traceback
 from PySide2 import QtWidgets
-from PySide2.QtCore import Qt, Signal, Slot
+from PySide2.QtCore import QTimer, Qt, Signal, Slot
 from PySide2.QtWidgets import QApplication, QDesktopWidget, QGridLayout, QGroupBox, QHBoxLayout, QMainWindow, QProgressBar, QSizePolicy, QSplitter, QStatusBar, QStyleFactory, QToolBar, QVBoxLayout, QWidget
 from numpy import disp
 
@@ -134,15 +134,18 @@ class MonoCalibrationGui(QMainWindow):
             # Notify observers of new/changed image data
             self.groupbox_imgview.setEnabled(True) #TODO reset, then populate with images
 
-            #TODO remove
+            #TODO remove (progress bar dummy test)
             import time
-            #TODO 03.10 hide progress bar after completion (timed!), see https://stackoverflow.com/a/61885754
             self.progress_bar.setVisible(True)
             self.status_bar.showMessage(f'Loading {self.image_source.num_images()} images from {folder}')
             for i in range(self.image_source.num_images()):
                 prg = int((i+1) / self.image_source.num_images() * 100)
                 self.progress_bar.setValue(prg)
                 time.sleep(0.1)
+            
+            # Hide the progress bar after 5 seconds
+            timer = QTimer(self)
+            timer.singleShot(5000, lambda: self.progress_bar.setVisible(False))
             self.status_bar.showMessage(f'Loaded {self.image_source.num_images()} images from {folder}', 10000)
         except (DirectoryNotFoundError, NoImageDirectoryError) as e:
             _logger.error("Error while loading image files:", exc_info=e)
@@ -151,7 +154,6 @@ class MonoCalibrationGui(QMainWindow):
             self.image_source = None
             self.calib_input.resetImageFolder()
         self._imageSourceChanged.emit(self.image_source)
-            #TODO self reset (calibwidget)
     
     @Slot()
     def onPatternConfigChanged(self):
