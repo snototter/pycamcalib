@@ -1,25 +1,23 @@
 import os
 from typing import Tuple
-from PySide2.QtCore import Qt, Signal, Slot
+from PySide2.QtCore import QEvent, QObject, Qt, Signal, Slot
+from PySide2.QtGui import QWheelEvent
 import numpy as np
 from .image_view import ImageViewer
 from PySide2.QtWidgets import QComboBox, QGridLayout, QHBoxLayout, QLabel, QSizePolicy, QSlider, QVBoxLayout, QWidget
 
 from ...processing import ImageSource, Preprocessor
 
-#TODO 04.10. adapt step slider (simply copied from iminspect)
 class SliderWidget(QWidget):
-    """Copied from iminspect.inputs"""
-
+    """Adapted from iminspect.inputs"""
+    # Emitted whenever the slider's value changes (either by the user or programmatically)
     valueChanged = Signal(object)
-    #FIXME 04.10 check if pyside manages to convert numeric object to int
-    # otherwise, we introduce intValueChanged and floatValueChanged
 
     def __init__(self, label, min_value=0, max_value=100, num_steps=10,
             initial_value=None,
             value_convert_fx=lambda v: int(v), # Type conversion (internally this slider uses floats)
             value_format_fx=lambda v: f'{v:4d}', # Maps slider value => string
-            min_label_width=None, parent=None):
+            min_label_width=None, value_display_left=False, parent=None):
         super().__init__(parent)
         self._min_value = min_value
         self._max_value = max_value
@@ -34,15 +32,20 @@ class SliderWidget(QWidget):
             lbl.setMinimumWidth(min_label_width)
         layout.addWidget(lbl)
 
+        self._slider_label = QLabel(' ')
+        if value_display_left:
+            layout.addWidget(self._slider_label)
+
         self._slider = QSlider(Qt.Horizontal)
         self._slider.setMinimum(0)
         self._slider.setMaximum(num_steps)
         self._slider.setTickPosition(QSlider.TicksBelow)
         self._slider.valueChanged.connect(self._onValueChanged)
+        self._slider.installEventFilter(self) # We want to override the default mouse wheel behavior too
         layout.addWidget(self._slider)
 
-        self._slider_label = QLabel(' ')
-        layout.addWidget(self._slider_label)
+        if not value_display_left:
+            layout.addWidget(self._slider_label)
 
         # Set label to maximum value, so we can fix the width
         self._slider_label.setText(value_format_fx(max_value))
@@ -61,6 +64,9 @@ class SliderWidget(QWidget):
         v = round((value - self._min_value)/self._step_size)
         return v
 
+    def value(self):
+        return self._sliderValue()
+
     def _sliderValue(self):
         v = self._slider.value()
         v = self._min_value + v * self._step_size
@@ -74,6 +80,52 @@ class SliderWidget(QWidget):
     def setValue(self, v):
         self._slider.setValue(self._toSliderValue(v))
         self._onValueChanged()
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Wheel and watched == self._slider:
+            # Discard mouse wheel for the slider (because we - its parent - will
+            # receive a wheelEvent, too)
+            return True
+        return super().eventFilter(watched, event)
+
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        if not self.isEnabled():
+            return
+        fac = -1 if event.delta() < 0 else +1
+        self._slider.setValue(self._toSliderValue(self.value() + fac * self._step_size))
+
+
+class PreProcStepSliderWidget(SliderWidget):
+    def __init__(self, image_source, preprocessor, label, min_value=0, max_value=100, num_steps=10,
+                 initial_value=None,
+                 value_convert_fx=lambda v: int(v), # Type conversion (internally this slider uses floats)
+                 value_format_fx=lambda v: f'{v:4d}', # Maps slider value => string
+                 min_label_width=None, value_display_left=True, parent=None):
+        super().__init__(label, min_value, max_value, num_steps, initial_value,
+                         value_convert_fx, value_format_fx, min_label_width,
+                         value_display_left, parent)
+        self.image_source = None
+        self.preprocessor = None
+        self.onImageSourceChanged(image_source)
+        self.onPreprocessorChanged(preprocessor)
+    
+    @Slot(ImageSource)
+    def onImageSourceChanged(self, image_source: ImageSource) -> None:
+        self.image_source = image_source
+        self.setEnabled(self.image_source is not None and self.preprocessor is not None)
+
+    @Slot(Preprocessor)
+    def onPreprocessorChanged(self, preprocessor: Preprocessor) -> None:
+        self.preprocessor = preprocessor
+        self.setEnabled(self.image_source is not None and self.preprocessor is not None)
+        if self.preprocessor is not None:
+            # Adjust range (change step to max number of steps if it was at max previously, too)
+            self._max_value = self.preprocessor.num_operations()
+            self._num_steps = self._max_value - 1
+            self._step_size = (self._max_value - 1) / self._num_steps
+            self._slider.setMinimum(0)
+            self._slider.setMaximum(self._num_steps)
+            self._slider.setValue(self._num_steps)
 
 
 class ImageComboboxWidget(QComboBox):

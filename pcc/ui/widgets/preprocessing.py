@@ -11,7 +11,7 @@ from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrectio
 from ...processing import ImageSource, ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
 from .common import HorizontalLine, displayError, ignoreMessageCallback
 from .preprocessing_configs import PreProcOpConfigDialog
-from .preprocessing_preview import Previewer, ImageComboboxWidget, SliderWidget
+from .preprocessing_preview import Previewer, ImageComboboxWidget, PreProcStepSliderWidget
 
 
 _logger = logging.getLogger('PreprocessingUI')
@@ -90,6 +90,9 @@ class OperationItem(QWidget):
         layout.addWidget(btn_del)
 
         self.setLayout(layout)
+
+        # if self.list_index % 2 == 1:
+        #     self.setStyleSheet("background-color: red;")
 
     @Slot()
     def onConfigure(self):
@@ -230,11 +233,13 @@ class PreprocessingSelector(QWidget):
         self.list_widget.setPalette(palette)
         # # self.list_widget.setAlternatingRowColors(True) #Doesn't work
         # # self.list_widget.setStyleSheet("alternate-background-color: white; background-color: blue;")
-        # layout_left.addWidget(self.list_widget)
         layout_main.addWidget(self.list_widget, 1, 0, 2, 1)
 
-        step_slider = SliderWidget('Preproc. Steps:', 1, self.preprocessor.num_operations(), self.preprocessor.num_operations()-1)
-        #FIXME make separate preproc slider: a) range must be adjustable b) disable if preproc is none
+        step_slider = PreProcStepSliderWidget(self.image_source, self.preprocessor,
+                                              'Preproc. Steps:', 1, self.preprocessor.num_operations(),
+                                              self.preprocessor.num_operations()-1)
+        self._imageSourceChanged.connect(step_slider.onImageSourceChanged)
+        self.preprocessorChanged.connect(step_slider.onPreprocessorChanged)
         layout_main.addWidget(step_slider, 1, 1, 1, 1)
 
         # Preview
