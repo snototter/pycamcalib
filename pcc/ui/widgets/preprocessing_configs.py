@@ -134,12 +134,12 @@ image which will be passed as input to the operation's 'apply()' method)."""
         gb_preview.setLayout(QVBoxLayout())
         layout_row.addWidget(gb_preview)
         
-        image_selection = ImageComboboxWidget(self.image_source)
-        gb_preview.layout().addWidget(image_selection)
+        self.image_selection = ImageComboboxWidget(self.image_source)
+        gb_preview.layout().addWidget(self.image_selection)
         self.preview = Previewer(self.preprocessor, self.preproc_step + 1)
-        image_selection.imageSelectionChanged.connect(self.preview.onImageSelectionChanged)
+        self.image_selection.imageSelectionChanged.connect(self.preview.onImageSelectionChanged)
         # Populate current image
-        self.preview.onImageSelectionChanged(*image_selection.getImageSelection())
+        self.preview.onImageSelectionChanged(*self.image_selection.getImageSelection())
 
         gb_preview.layout().addWidget(self.preview)
 
@@ -149,6 +149,12 @@ image which will be passed as input to the operation's 'apply()' method)."""
         btn_box.rejected.connect(self.reject)
         layout_main.addWidget(btn_box)
         self.setMinimumWidth(600)
+
+    def setSelectedPreviewIndex(self, index: int) -> None:
+        self.image_selection.setCurrentIndex(index)
+        sel = self.image_selection.getImageSelection()
+        # Setting the combobox's index programmatically doesn't trigger the signal
+        self.preview.onImageSelectionChanged(*self.image_selection.getImageSelection())
 
     @Slot()
     def onConfigurationUpdated(self):

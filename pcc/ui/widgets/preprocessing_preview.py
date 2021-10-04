@@ -21,8 +21,8 @@ class SliderWidget(QWidget):
         super().__init__(parent)
         self._min_value = min_value
         self._max_value = max_value
-        self._num_steps = num_steps
-        self._step_size = (max_value - min_value) / num_steps
+        self._num_steps = max(1, num_steps)
+        self._step_size = (max_value - min_value) / self._num_steps
         self._value_format_fx = value_format_fx
         self._value_convert_fx = value_convert_fx
 
@@ -53,6 +53,7 @@ class SliderWidget(QWidget):
 
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
+        self.setEnabled(self._max_value > self._min_value)
 
         if initial_value is None:
             self._slider.setValue(self._toSliderValue(min_value))
@@ -61,7 +62,7 @@ class SliderWidget(QWidget):
         self._onValueChanged()
 
     def _toSliderValue(self, value):
-        v = round((value - self._min_value)/self._step_size)
+        v = round((value - self._min_value)/max(1, self._step_size))
         return v
 
     def value(self):
@@ -121,11 +122,11 @@ class PreProcStepSliderWidget(SliderWidget):
         if self.preprocessor is not None:
             # Adjust range (change step to max number of steps if it was at max previously, too)
             self._max_value = self.preprocessor.num_operations()
-            self._num_steps = self._max_value - 1
+            self._num_steps = max(1, self._max_value - 1)
             self._step_size = (self._max_value - 1) / self._num_steps
             self._slider.setMinimum(0)
             self._slider.setMaximum(self._num_steps)
-            self._slider.setValue(self._num_steps)
+            self._slider.setEnabled(self._max_value > self._min_value)
 
 
 class ImageComboboxWidget(QComboBox):

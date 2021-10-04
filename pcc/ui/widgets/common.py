@@ -163,7 +163,7 @@ class ValidatedIntegerInputWidget(QWidget):
     @Slot(str)
     def _textEdited(self, text):
         res, modified_text, _ = self.validator.validate(text, 0)
-        print(f'Validated "{text}": {res}', self.validator.bottom(), self.validator.top())
+        # print(f'Validated "{text}": {res}', self.validator.bottom(), self.validator.top())
 
         if res == QValidator.Acceptable:
             self.is_valid = True

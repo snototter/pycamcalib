@@ -2,12 +2,11 @@ import inspect
 import logging
 import os
 import pathlib
-from PIL.Image import Image
+import numpy as np
 from PySide2.QtCore import QSize, Qt, Signal, Slot
 from PySide2.QtGui import QIcon, QPalette
 from PySide2.QtWidgets import QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QSizePolicy, QSpacerItem, QToolButton, QVBoxLayout, QWidget
 
-from pcc.processing.preprocessing import PreProcOpCLAHE, PreProcOpGammaCorrection, PreProcOpGrayscale, PreProcOpHistEq #TODO remove
 from ...processing import ImageSource, ConfigurationError, Preprocessor, PreProcOpGrayscale, PreProcOperationBase, AVAILABLE_PREPROCESSOR_OPERATIONS
 from .common import HorizontalLine, displayError, ignoreMessageCallback
 from .preprocessing_configs import PreProcOpConfigDialog
@@ -38,9 +37,10 @@ class OperationItem(QWidget):
 
     def __init__(self, image_source: ImageSource, preprocessor: Preprocessor,
                  operation: PreProcOperationBase, list_index: int,
-                 number_operations: int, parent=None):
+                 number_operations: int, preview_image_index: int, parent=None):
         super().__init__(parent)
         self.image_source = image_source
+        self.preview_image_index = preview_image_index
         self.preprocessor = preprocessor
         self.operation = operation
         self.list_index = list_index
@@ -90,7 +90,6 @@ class OperationItem(QWidget):
         layout.addWidget(btn_del)
 
         self.setLayout(layout)
-
         # if self.list_index % 2 == 1:
         #     self.setStyleSheet("background-color: red;")
 
@@ -103,6 +102,7 @@ class OperationItem(QWidget):
         # Show configuration dialog
         dlg = PreProcOpConfigDialog(self.list_index, self.image_source,
                                     self.preprocessor, self.operation, self)
+        dlg.setSelectedPreviewIndex(self.preview_image_index)
         if dlg.exec_():
             # Check if the parameters actually differ:
             if dlg.hasConfigurationChanged():
@@ -122,6 +122,10 @@ class OperationItem(QWidget):
     @Slot(Preprocessor)
     def onPreprocessorChanged(self, preprocessor: Preprocessor):
         self.preprocessor = preprocessor
+    
+    @Slot(int, np.ndarray)
+    def onImageSelectionChanged(self, index: int, image: np.ndarray):
+        self.preview_image_index = index
 
 
 class AddOperationItem(QWidget):
@@ -181,13 +185,8 @@ class PreprocessingSelector(QWidget):
         # bar via the specified message callback
         self.showMessage = message_callback
 
-        #TODO remove the rest
-        self.preprocessor.add_operation(PreProcOpGammaCorrection())
-        self.preprocessor.add_operation(PreProcOpHistEq())
-        self.preprocessor.add_operation(PreProcOpCLAHE())
-
-        # For saving the pipeline, we suggest the user the same directory
-        # a config has been loaded from (if config will be loaded).
+        # When saving the pipeline, we suggest the user the same directory
+        # a config has been loaded from (if s/he opened a config).
         # Empty string results in the current/last opened directory (qt default)
         self._previously_selected_folder = ''
 
@@ -219,9 +218,9 @@ class PreprocessingSelector(QWidget):
         layout_controls.addWidget(self._btn_save)
 
         # Image selection
-        image_selection = ImageComboboxWidget(self.image_source)
-        self._imageSourceChanged.connect(image_selection.onImageSourceChanged)
-        layout_main.addWidget(image_selection, 0, 1, 1, 1)
+        self.image_selection = ImageComboboxWidget(self.image_source)
+        self._imageSourceChanged.connect(self.image_selection.onImageSourceChanged)
+        layout_main.addWidget(self.image_selection, 0, 1, 1, 1)
 
         # 2nd row contains the list widget + step slider
         self.list_widget = QListWidget()
@@ -245,10 +244,8 @@ class PreprocessingSelector(QWidget):
         # Preview
         self.preview = Previewer(self.preprocessor, -1)
         self.preprocessorChanged.connect(self.preview.onPreprocessorChanged)
-        image_selection.imageSelectionChanged.connect(self.preview.onImageSelectionChanged)
+        self.image_selection.imageSelectionChanged.connect(self.preview.onImageSelectionChanged)
         step_slider.valueChanged.connect(self.preview.onStepChanged)
-        # step_slider.intValueChanged.connect(self.preview.onStepChanged)#FIXME 04.10 see comments in SliderWidget
-
         layout_main.addWidget(self.preview, 2, 1, 1, 1)
         
         layout_main.setRowStretch(2, 10)
@@ -264,10 +261,12 @@ class PreprocessingSelector(QWidget):
             self.list_widget.addItem(item)
             # Initialize the operation item widget
             item_widget = OperationItem(self.image_source, self.preprocessor,
-                                        op, idx, self.preprocessor.num_operations())
+                                        op, idx, self.preprocessor.num_operations(),
+                                        self.image_selection.currentIndex())
             item_widget.configurationChanged.connect(self.onOperationConfigurationHasChanged)
             self.preprocessorChanged.connect(item_widget.onPreprocessorChanged)
             self._imageSourceChanged.connect(item_widget.onImageSourceChanged)
+            self.image_selection.imageSelectionChanged.connect(item_widget.onImageSelectionChanged)
             item_widget.moveUp.connect(self.onMoveUp)
             item_widget.moveDown.connect(self.onMoveDown)
             item_widget.toggled.connect(self.onOperationCheckboxToggled)
