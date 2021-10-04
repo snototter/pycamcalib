@@ -128,8 +128,8 @@ color conversion to YCrCb."""
     def apply(self, image: np.ndarray) -> np.ndarray:
         if not self.enabled:
             return image
-        if image.ndim == 3 and image.shape[2] == 3:
-            ycrcb = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
+        if image.ndim == 3 and image.shape[2] in [3, 4]:
+            ycrcb = cv2.cvtColor(image[:, :, :3], cv2.COLOR_RGB2YCrCb)
             yeq = cv2.equalizeHist(ycrcb[:, :, 0])
             ycrcb[:, :, 0] = yeq
             return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2RGB)
@@ -157,11 +157,12 @@ class PreProcOpCLAHE(PreProcOperationBase):
     def apply(self, image: np.ndarray) -> np.ndarray:
         if not self.enabled:
             return image
-        if image.ndim == 3 and image.shape[2] == 3:
-            ycrcb = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
+        if image.ndim == 3 and image.shape[2] in [3, 4]:
+            ycrcb = cv2.cvtColor(image[:, :, :3], cv2.COLOR_RGB2YCrCb)
             yeq = self.clahe.apply(ycrcb[:, :, 0])
             ycrcb[:, :, 0] = yeq
             return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2RGB)
+        
         else:
             return self.clahe.apply(image)
 

@@ -1,6 +1,7 @@
 """Common/basic UI widgets & functionality."""
+from typing import Tuple
 from PySide2.QtCore import QLocale, Qt, Signal, Slot
-from PySide2.QtGui import QDoubleValidator, QFontDatabase, QValidator
+from PySide2.QtGui import QDoubleValidator, QFontDatabase, QIntValidator, QValidator
 from PySide2.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QProgressBar, QSizePolicy, QWidget
 
 # QIcon.fromTheme: use system theme icons, see naming specs at
@@ -52,11 +53,12 @@ class ValidatedFloatInputWidget(QWidget):
         super().__init__(parent)
         layout = QHBoxLayout()
         self.setLayout(layout)
-        # Label to the left:
-        lbl = QLabel(label_text)
-        lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        lbl.setAlignment(Qt.AlignLeft)
-        layout.addWidget(lbl)
+        if label_text is not None:
+            # Label to the left:
+            lbl = QLabel(label_text)
+            lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            lbl.setAlignment(Qt.AlignLeft)
+            layout.addWidget(lbl)
         # Input to the right
         self.line_edit = QLineEdit()
         self.line_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -113,4 +115,98 @@ class ValidatedFloatInputWidget(QWidget):
         #self.line_edit.style().unpolish(self.line_edit)
         #self.line_edit.style().polish(self.line_edit)
 
-#TODO ValidatedSizeInputWidget
+
+class ValidatedIntegerInputWidget(QWidget):
+    editingFinished = Signal()
+    valueChanged = Signal()
+
+    def __init__(self, label_text: str, initial_value: int = None,
+                 min_val: int = None, max_val: int = None, parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout()
+        self.setLayout(layout)
+        if label_text is not None:
+            # Label to the left:
+            lbl = QLabel(label_text)
+            lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            lbl.setAlignment(Qt.AlignLeft)
+            layout.addWidget(lbl)
+        # Input to the right
+        self.line_edit = QLineEdit()
+        self.line_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.line_edit.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.line_edit.setAlignment(Qt.AlignRight)
+        self.line_edit.editingFinished.connect(self.editingFinished)
+        layout.addWidget(self.line_edit)
+        self.is_valid = True
+        self.validator = QIntValidator()
+        if min_val is not None:
+            self.validator.setBottom(min_val)
+        if max_val is not None:
+            self.validator.setTop(max_val)
+        self.line_edit.setValidator(self.validator)
+        self.line_edit.textEdited.connect(self._textEdited)
+        if initial_value is not None:
+            text = str(initial_value)
+            self.line_edit.setText(text)
+            self._textEdited(text)
+
+    def valid(self):
+        return self.is_valid
+
+    def value(self):
+        if self.is_valid:
+            return int(self.line_edit.text())
+        else:
+            return None
+
+    @Slot(str)
+    def _textEdited(self, text):
+        res, modified_text, _ = self.validator.validate(text, 0)
+        print(f'Validated "{text}": {res}', self.validator.bottom(), self.validator.top())
+
+        if res == QValidator.Acceptable:
+            self.is_valid = True
+            val = int(modified_text)
+            self.line_edit.setStyleSheet("border: 2px solid green;")
+            self.valueChanged.emit()
+        elif res in [QValidator.Invalid, QValidator.Intermediate]:
+            self.is_valid = False
+            self.line_edit.setStyleSheet("border: 2px solid red;")
+
+
+class ValidatedSizeInputWidget(QWidget):
+    editingFinished = Signal()
+    valueChanged = Signal()
+
+    def __init__(self, label_text: str, initial_value: Tuple[int, int] = (None, None),
+                 min_val: Tuple[int, int] = (None, None), max_val: Tuple[int, int] = (None, None),
+                 parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout()
+        self.setLayout(layout)
+        # Label to the left:
+        lbl = QLabel(label_text)
+        lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        lbl.setAlignment(Qt.AlignLeft)
+        layout.addWidget(lbl)
+        # Inputs to the right
+        self.rows = ValidatedIntegerInputWidget(None, initial_value[0], min_val[0], max_val[0])
+        self.rows.valueChanged.connect(self.valueChanged)
+        self.rows.editingFinished.connect(self.editingFinished)
+        layout.addWidget(self.rows)
+        lblx = QLabel('x')
+        layout.addWidget(lblx)
+        self.columns = ValidatedIntegerInputWidget(None, initial_value[1], min_val[1], max_val[1])
+        self.columns.valueChanged.connect(self.valueChanged)
+        self.columns.editingFinished.connect(self.editingFinished)
+        layout.addWidget(self.columns)
+
+    def valid(self):
+        return self.rows.is_valid and self.columns.is_valid
+
+    def value(self):
+        if self.valid():
+            return (self.rows.value(), self.columns.value())
+        else:
+            return (None, None)

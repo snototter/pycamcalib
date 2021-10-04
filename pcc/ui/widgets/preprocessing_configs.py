@@ -2,16 +2,13 @@
 import inspect
 import sys
 from PySide2.QtCore import Signal, Slot
-from PySide2.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout, QPushButton, QVBoxLayout, QWidget
+from PySide2.QtWidgets import QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from pcc.ui.widgets.preprocessing_preview import Previewer, ImageComboboxWidget
 
 from ...processing import PreProcOpGammaCorrection, PreProcOpCLAHE
-from .common import displayError, ValidatedFloatInputWidget
-from .image_view import ImageViewer
+from .common import displayError, ValidatedFloatInputWidget, ValidatedSizeInputWidget
 
-
-#TODO add CLAHEConfigWidget
 
 class GammaCorrectionConfigWidget(QWidget):
     operation_name = PreProcOpGammaCorrection.name
@@ -42,7 +39,40 @@ class GammaCorrectionConfigWidget(QWidget):
         else:
             displayError('Configuration is invalid, please validate gamma.', parent=self)
 
-      
+
+class CLAHEConfigWidget(QWidget):
+    operation_name = PreProcOpCLAHE.name
+
+    configurationUpdated = Signal()
+
+    def __init__(self, operation, parent=None):
+        super().__init__(parent)
+        self.operation = operation
+
+        layout_main = QVBoxLayout()
+        self.setLayout(layout_main)
+        self.clip_widget = ValidatedFloatInputWidget('Clip Limit:', self.operation.clip_limit, decimals=1)
+        self.clip_widget.editingFinished.connect(self._updateParameters)
+        layout_main.addWidget(self.clip_widget)
+
+        self.tile_widget = ValidatedSizeInputWidget('Tile Size:', self.operation.tile_size, (1, 1))
+        self.tile_widget.editingFinished.connect(self._updateParameters)
+        layout_main.addWidget(self.tile_widget)
+
+        button = QPushButton('Apply')
+        button.clicked.connect(self._updateParameters)
+        layout_main.addWidget(button)
+
+        layout_main.addStretch()
+    
+    @Slot()
+    def _updateParameters(self):
+        if self.clip_widget.valid() and self.tile_widget.valid():
+            self.operation.set_clip_limit(self.clip_widget.value())
+            self.operation.set_tile_size(self.tile_widget.value())
+            self.configurationUpdated.emit()
+        else:
+            displayError('Configuration is invalid, please change the parameters.', parent=self)
 
 
 class PreProcOpConfigDialog(QDialog):
@@ -97,7 +127,7 @@ image which will be passed as input to the operation's 'apply()' method)."""
         config_widget = wclass(self.operation)
         gb_config.layout().addWidget(config_widget)
         config_widget.configurationUpdated.connect(self.onConfigurationUpdated)
-        gb_config.setFixedWidth(200)
+        gb_config.setMinimumWidth(200)
 
         # 2nd column: preview
         gb_preview = QGroupBox("Preview")
@@ -118,6 +148,7 @@ image which will be passed as input to the operation's 'apply()' method)."""
         btn_box.accepted.connect(self.accept)
         btn_box.rejected.connect(self.reject)
         layout_main.addWidget(btn_box)
+        self.setMinimumWidth(600)
 
     @Slot()
     def onConfigurationUpdated(self):
