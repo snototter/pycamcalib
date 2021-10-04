@@ -72,6 +72,23 @@ class PreProcOpGrayscale(PreProcOperationBase):
         return image
 
 
+# class PreProcOpRemoveAlpha(PreProcOperationBase):
+#     """Removes the alpha channel"""
+
+#     name = 'strip-alpha'
+#     display = 'Remove Alpha Channel'
+    
+#     def description(self) -> str:
+#         return self.display
+
+#     def apply(self, image: np.ndarray) -> np.ndarray:
+#         if not self.enabled:
+#             return image
+#         if image.ndim == 3 and image.shape[2] > 3:
+#             return image[:, :, :3]
+#         return image
+
+
 class PreProcOpGammaCorrection(PreProcOperationBase):
     """Applies Gamma correction"""
 
