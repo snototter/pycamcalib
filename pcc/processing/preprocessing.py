@@ -274,9 +274,9 @@ class PreProcOpThreshold(PreProcOperationBase):
         if 'threshold_value' in config:
             self.threshold_value = config["threshold_value"]
         if 'threshold_type' in config:
-            self.tile_size = tuple(config["threshold_type"])
+            self.threshold_type = config["threshold_type"]
         if 'max_value' in config:
-            self.tile_size = tuple(config["max_value"])
+            self.max_value = config["max_value"]
 
     def freeze(self) -> dict:
         d = {'threshold_value': self.threshold_value,

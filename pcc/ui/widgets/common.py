@@ -1,5 +1,5 @@
 """Common/basic UI widgets & functionality."""
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 from PySide2.QtCore import QLocale, Qt, Signal, Slot
 from PySide2.QtGui import QDoubleValidator, QFontDatabase, QIntValidator, QValidator
 from PySide2.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QProgressBar, QSizePolicy, QWidget
@@ -178,7 +178,7 @@ class ValidatedIntegerInputWidget(QWidget):
 class SelectionInputWidget(QWidget):
     valueChanged = Signal()
 
-    def __init__(self, label_text: str, choices: List[Tuple[int, str]], initial_idx: int = 0,
+    def __init__(self, label_text: str, choices: Sequence[Tuple[int, str]], initial_idx: int = 0,
                  parent=None):
         super().__init__(parent)
         layout = QHBoxLayout()
