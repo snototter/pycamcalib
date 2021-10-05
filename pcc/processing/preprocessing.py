@@ -192,7 +192,6 @@ class PreProcOpCLAHE(PreProcOperationBase):
             yeq = self.clahe.apply(ycrcb[:, :, 0])
             ycrcb[:, :, 0] = yeq
             return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2RGB)
-        
         else:
             return self.clahe.apply(image)
 
@@ -233,16 +232,13 @@ class PreProcOpThreshold(PreProcOperationBase):
     name = 'thresholding'
     display = 'Thresholding'
 
-    type_names = {cv2.THRESH_BINARY: 'Binary',
-                  cv2.THRESH_BINARY_INV: 'Binary inv.',
-                #   cv2.THRESH_TRUNC: 'Truncate',
-                #   cv2.THRESH_TOZERO: 'To Zero',
-                #   cv2.THRESH_TOZERO_INV: 'To Zero inv.',
-                #   cv2.THRESH_TRIANGLE: 'Triangle',
-                  cv2.THRESH_OTSU: 'Otsu'
-                #   cv2.THRESH_MASK: 'Mask'
-                  }
-
+    threshold_types = [(cv2.THRESH_BINARY, 'Binary'),
+                       (cv2.THRESH_BINARY_INV, 'Binary inv.'),
+                       (cv2.THRESH_OTSU, 'Otsu'),
+                       (cv2.THRESH_TOZERO, 'To Zero'),
+                       (cv2.THRESH_TOZERO_INV, 'To Zero inv.'),
+                       (cv2.THRESH_TRIANGLE, 'Triangle'),
+                       (cv2.THRESH_TRUNC, 'Truncate')]
 
     def __init__(self, threshold_value: int = 127, max_value: int = 255, threshold_type: int = cv2.THRESH_BINARY):
         super().__init__()
@@ -251,23 +247,27 @@ class PreProcOpThreshold(PreProcOperationBase):
         self.max_value = max_value
 
     def description(self) -> str:
-        return f'{self.display} (thresh={self.threshold_value:.1f}, max={self.max_value}, type={self.threshold_type})'
+        return f'{self.display} (thresh={self.threshold_value}, max={self.max_value}, type={self._type2str()})'
 
     def apply(self, image: np.ndarray) -> np.ndarray:
         if not self.enabled:
             return image
-        # if image.ndim == 3 and image.shape[2] in [3, 4]:
-        #     ycrcb = cv2.cvtColor(image[:, :, :3], cv2.COLOR_RGB2YCrCb)
-        #     yeq = self.clahe.apply(ycrcb[:, :, 0])
-        #     ycrcb[:, :, 0] = yeq
-        #     return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2RGB)
-        
-        # else:
-        #     return self.clahe.apply(image)
+        # Otsu & Triangle only accept single channel inputs
+        if image.ndim == 3 and self.threshold_type in [cv2.THRESH_TRIANGLE, cv2.THRESH_OTSU]:
+            image = imutils.grayscale(image)
         _, thresh = cv2.threshold(image, self.threshold_value, self.max_value, self.threshold_type)
         return thresh
 
-    #TODO def set_PARAM
+    def set_threshold_value(self, threshold: int) -> None:
+        self.threshold_value = threshold
+
+    def set_max_value(self, max_value: int) -> None:
+        self.max_value = max_value
+
+    def set_threshold_type(self, ttype: int) -> None:
+        if ttype not in [tt[0] for tt in PreProcOpThreshold.threshold_types]:
+            raise ValueError(f'Threshold type ({ttype}) is not supported')
+        self.threshold_type = ttype
 
     def configure(self, config: dict) -> None:
         super().configure(config)
@@ -285,8 +285,17 @@ class PreProcOpThreshold(PreProcOperationBase):
         d.update(super().freeze())
         return d
 
+    def _type2str(self, threshold_type: int = None) -> str:
+        if threshold_type is None:
+            threshold_type = self.threshold_type
+        for tt, ts in PreProcOpThreshold.threshold_types:
+            if tt == threshold_type:
+                return ts
+        raise ValueError(f'Threshold type ({threshold_type}) is not supported')
+
     def __repr__(self) -> str:
-        return f'{self.display} (t={self.threshold_value:.1f}, max={self.max_value}, {self.threshold_type})'
+        return f'{self.display} (th={self.threshold_value}, max={self.max_value}, {self._type2str()})'
+
 
 # List of all available preprocessing operations.
 # Since we want to provide a custom ordering of the operations in the UI, this
@@ -388,10 +397,11 @@ if __name__ == '__main__':
 
 
     gray = PreProcOpGrayscale().apply(img)
-    for ttype in PreProcOpThreshold.type_names:
+    imvis.imshow(gray, 'original', wait_ms=10)
+    for ttype, tname in PreProcOpThreshold.threshold_types:
         op = PreProcOpThreshold(threshold_type=ttype)
         result = op.apply(gray)
-        imvis.imshow(result, PreProcOpThreshold.type_names[ttype], wait_ms=-1)
+        imvis.imshow(result, tname, wait_ms=-1)
 
     assert False
 

@@ -1,8 +1,8 @@
 """Common/basic UI widgets & functionality."""
-from typing import Tuple
+from typing import List, Tuple
 from PySide2.QtCore import QLocale, Qt, Signal, Slot
 from PySide2.QtGui import QDoubleValidator, QFontDatabase, QIntValidator, QValidator
-from PySide2.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QProgressBar, QSizePolicy, QWidget
+from PySide2.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QProgressBar, QSizePolicy, QWidget
 
 # QIcon.fromTheme: use system theme icons, see naming specs at
 # https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
@@ -88,10 +88,10 @@ class ValidatedFloatInputWidget(QWidget):
             self.line_edit.setText(text)
             self._textEdited(text)
 
-    def valid(self):
+    def valid(self) -> bool:
         return self.is_valid
 
-    def value(self):
+    def value(self) -> float:
         if self.is_valid:
             return float(self.line_edit.text())
         else:
@@ -151,14 +151,60 @@ class ValidatedIntegerInputWidget(QWidget):
             self.line_edit.setText(text)
             self._textEdited(text)
 
-    def valid(self):
+    def valid(self) -> bool:
         return self.is_valid
 
-    def value(self):
+    def value(self) -> int:
         if self.is_valid:
             return int(self.line_edit.text())
         else:
             return None
+
+    @Slot(str)
+    def _textEdited(self, text):
+        res, modified_text, _ = self.validator.validate(text, 0)
+        # print(f'Validated "{text}": {res}', self.validator.bottom(), self.validator.top())
+
+        if res == QValidator.Acceptable:
+            self.is_valid = True
+            val = int(modified_text)
+            self.line_edit.setStyleSheet("border: 2px solid green;")
+            self.valueChanged.emit()
+        elif res in [QValidator.Invalid, QValidator.Intermediate]:
+            self.is_valid = False
+            self.line_edit.setStyleSheet("border: 2px solid red;")
+
+
+class SelectionInputWidget(QWidget):
+    valueChanged = Signal()
+
+    def __init__(self, label_text: str, choices: List[Tuple[int, str]], initial_idx: int = 0,
+                 parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout()
+        self.setLayout(layout)
+        if label_text is not None:
+            # Label to the left:
+            lbl = QLabel(label_text)
+            lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            lbl.setAlignment(Qt.AlignLeft)
+            layout.addWidget(lbl)
+        # Input to the right
+        self.selection = QComboBox()
+        self.selection.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        for cid, ctxt in choices:
+            self.selection.addItem(ctxt, cid)
+        # Select initial element
+        if initial_idx is not None:
+            self.selection.setCurrentIndex(initial_idx)
+        self.selection.currentIndexChanged.connect(lambda _: self.valueChanged.emit())
+        layout.addWidget(self.selection)
+
+    def valid(self) -> bool:
+        return True
+
+    def value(self) -> Tuple[int, str]:
+        return (self.selection.currentData(), self.selection.currentText())
 
     @Slot(str)
     def _textEdited(self, text):
@@ -202,10 +248,10 @@ class ValidatedSizeInputWidget(QWidget):
         self.columns.editingFinished.connect(self.editingFinished)
         layout.addWidget(self.columns)
 
-    def valid(self):
+    def valid(self) -> bool:
         return self.rows.is_valid and self.columns.is_valid
 
-    def value(self):
+    def value(self) -> Tuple[int, int]:
         if self.valid():
             return (self.rows.value(), self.columns.value())
         else:

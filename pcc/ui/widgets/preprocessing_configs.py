@@ -6,8 +6,8 @@ from PySide2.QtWidgets import QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
 
 from pcc.ui.widgets.preprocessing_preview import Previewer, ImageComboboxWidget
 
-from ...processing import PreProcOpGammaCorrection, PreProcOpCLAHE
-from .common import displayError, ValidatedFloatInputWidget, ValidatedSizeInputWidget
+from ...processing import PreProcOpGammaCorrection, PreProcOpCLAHE, PreProcOpThreshold
+from .common import ValidatedIntegerInputWidget, displayError, ValidatedFloatInputWidget, ValidatedSizeInputWidget, SelectionInputWidget
 
 
 class GammaCorrectionConfigWidget(QWidget):
@@ -74,6 +74,52 @@ class CLAHEConfigWidget(QWidget):
         else:
             displayError('Configuration is invalid, please change the parameters.', parent=self)
 
+
+class ThresholdConfigWidget(QWidget):
+    operation_name = PreProcOpThreshold.name
+
+    configurationUpdated = Signal()
+
+    def __init__(self, operation, parent=None):
+        super().__init__(parent)
+        self.operation = operation
+
+        layout_main = QVBoxLayout()
+        self.setLayout(layout_main)
+        self.threshold_widget = ValidatedIntegerInputWidget('Threshold:', self.operation.threshold_value, 0, 255)
+        self.threshold_widget.editingFinished.connect(self._updateParameters)
+        layout_main.addWidget(self.threshold_widget)
+
+        self.max_widget = ValidatedIntegerInputWidget('Max. Value:', self.operation.max_value, 0, 255)
+        self.max_widget.editingFinished.connect(self._updateParameters)
+        layout_main.addWidget(self.max_widget)
+
+        choices = list()
+        initial_selection = 0
+        for idx in range(len(PreProcOpThreshold.threshold_types)):
+            ttype = PreProcOpThreshold.threshold_types[idx]
+            if self.operation.threshold_type == ttype[0]:
+                initial_selection = idx
+            choices.append(ttype)
+        self.type_widget = SelectionInputWidget('Type:', choices, initial_selection)
+        self.type_widget.valueChanged.connect(self._updateParameters)
+        layout_main.addWidget(self.type_widget)
+
+        button = QPushButton('Apply')
+        button.clicked.connect(self._updateParameters)
+        layout_main.addWidget(button)
+
+        layout_main.addStretch()
+    
+    @Slot()
+    def _updateParameters(self):
+        if self.threshold_widget.valid() and self.max_widget.valid():
+            self.operation.set_threshold_value(self.threshold_widget.value())
+            self.operation.set_max_value(self.max_widget.value())
+            self.operation.set_threshold_type(self.type_widget.value()[0])
+            self.configurationUpdated.emit()
+        else:
+            displayError('Configuration is invalid, please validate gamma.', parent=self)
 
 class PreProcOpConfigDialog(QDialog):
     """A dialog to configure preprocessing operations.

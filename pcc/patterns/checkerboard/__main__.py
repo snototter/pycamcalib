@@ -228,12 +228,13 @@ def demo_standard_checkerboard():
 
 def demo_shifted_checkerboard():
     # bwidth, bheight = PAPER_DIMENSIONS['A3']
-    # board = ShiftedCheckerboardSpecification('shifted-a3',
-    #                                          board_width_mm=bwidth, board_height_mm=bheight,
-    #                                          num_squares_horizontal=13,
-    #                                          num_squares_vertical=19,
-    #                                          checkerboard_square_length_mm=20)#, overlay_board_specifications=False)
-    # export_board(board, prevent_overwrite=False)
+    board = ShiftedCheckerboardSpecification('lidar-calibration',
+                                             board_width_mm=917, board_height_mm=642,
+                                             num_squares_horizontal=9,
+                                             num_squares_vertical=6,
+                                             checkerboard_square_length_mm=90, overlay_board_specifications=False)
+    export_board(board, prevent_overwrite=False)
+    assert False
 
     bwidth, bheight = PAPER_DIMENSIONS['A4']
     board = ShiftedCheckerboardSpecification('shifted-checkerboard',
@@ -303,5 +304,5 @@ def demo_shifted_checkerboard():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    demo_standard_checkerboard()
+    # demo_standard_checkerboard()
     demo_shifted_checkerboard()

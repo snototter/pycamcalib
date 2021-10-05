@@ -115,7 +115,7 @@ margin_horizontal_mm, margin_vertical_mm: Distance from the edge of the physical
                 height = self.checkerboard_square_length_mm
                 top = self.margin_vertical_mm + square_length_half_mm\
                     + (row - 1) * self.checkerboard_square_length_mm
-            for col in range((row + 1) % 2, self.num_squares_horizontal + 1, 2):
+            for col in range(row % 2, self.num_squares_horizontal + 1, 2):
                 if col in [0, self.num_squares_horizontal]:
                     # Left- and right-most columns contain "half squares"
                     left = self.margin_horizontal_mm if col == 0 else\
