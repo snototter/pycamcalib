@@ -234,18 +234,18 @@ class PreprocessingSelector(QWidget):
         # # self.list_widget.setStyleSheet("alternate-background-color: white; background-color: blue;")
         layout_main.addWidget(self.list_widget, 1, 0, 2, 1)
 
-        step_slider = PreProcStepSliderWidget(self.image_source, self.preprocessor,
-                                              'Preproc. Steps:', 1, self.preprocessor.num_operations(),
-                                              self.preprocessor.num_operations()-1)
-        self._imageSourceChanged.connect(step_slider.onImageSourceChanged)
-        self.preprocessorChanged.connect(step_slider.onPreprocessorChanged)
-        layout_main.addWidget(step_slider, 1, 1, 1, 1)
+        self.step_slider = PreProcStepSliderWidget(self.image_source, self.preprocessor,
+                                                  'Preproc. Steps:', 1, self.preprocessor.num_operations(),
+                                                  self.preprocessor.num_operations()-1)
+        self._imageSourceChanged.connect(self.step_slider.onImageSourceChanged)
+        self.preprocessorChanged.connect(self.step_slider.onPreprocessorChanged)
+        layout_main.addWidget(self.step_slider, 1, 1, 1, 1)
 
         # Preview
         self.preview = Previewer(self.preprocessor, -1)
         self.preprocessorChanged.connect(self.preview.onPreprocessorChanged)
         self.image_selection.imageSelectionChanged.connect(self.preview.onImageSelectionChanged)
-        step_slider.valueChanged.connect(self.preview.onStepChanged)
+        self.step_slider.valueChanged.connect(self.preview.onStepChanged)
         layout_main.addWidget(self.preview, 2, 1, 1, 1)
         
         layout_main.setRowStretch(2, 10)
@@ -310,6 +310,7 @@ class PreprocessingSelector(QWidget):
         self.preprocessor.remove(op_idx)
         self.preprocessorChanged.emit(self.preprocessor)
         self._updateList()
+        self.step_slider.changeToLastStep()
 
     @Slot(int, bool)
     def onOperationCheckboxToggled(self, op_idx, enabled):
@@ -323,6 +324,7 @@ class PreprocessingSelector(QWidget):
         self.preprocessor.add_operation(operation)
         self.preprocessorChanged.emit(self.preprocessor)
         self._updateList()
+        self.step_slider.changeToLastStep()
 
     @Slot(int)
     def onOperationConfigurationHasChanged(self, _):

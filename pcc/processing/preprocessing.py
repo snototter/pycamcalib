@@ -10,6 +10,20 @@ from vito import imutils
 # * maybe add naive contrast adjustment I*alpha + beta https://towardsdatascience.com/exploring-image-processing-techniques-opencv-4860006a243
 
 
+# @param src Source 8-bit single-channel image.
+# @param maxValue Non-zero value assigned to the pixels for which the condition is satisfied
+# @param adaptiveMethod Adaptive thresholding algorithm to use, see cv::AdaptiveThresholdTypes
+# @param thresholdType Thresholding type that must be either THRESH_BINARY or THRESH_BINARY_INV,
+# @param blockSize Size of a pixel neighborhood that is used to calculate a threshold value for the
+# pixel: 3, 5, 7, and so on.
+# @param C Constant subtracted from the mean or weighted mean (see the details below). Normally, it
+# is positive but may be zero or negative as well.
+# CV_EXPORTS_W void adaptiveThreshold( InputArray src, OutputArray dst,
+#                                      double maxValue, int adaptiveMethod,
+#                                      int thresholdType, int blockSize, double C );
+
+
+
 _logger = logging.getLogger('Preprocessing')
 
 
@@ -154,7 +168,6 @@ color conversion to YCrCb."""
             return cv2.equalizeHist(image)
 
 
-#TODO configurable (tile size, clip limit), add widget!
 class PreProcOpCLAHE(PreProcOperationBase):
     """Applies contrast limited adaptive histogram equalization."""
 
@@ -212,12 +225,76 @@ class PreProcOpCLAHE(PreProcOperationBase):
         return f'{self.name}(cl={self.clip_limit:.1f}, ts={self.tile_size})'
 
 
+# CV_EXPORTS_W double threshold( InputArray src, OutputArray dst,
+#                                double thresh, double maxval, int type );
+class PreProcOpThreshold(PreProcOperationBase):
+    """Applies simple thresholding"""
+
+    name = 'thresholding'
+    display = 'Thresholding'
+
+    type_names = {cv2.THRESH_BINARY: 'Binary',
+                  cv2.THRESH_BINARY_INV: 'Binary inv.',
+                #   cv2.THRESH_TRUNC: 'Truncate',
+                #   cv2.THRESH_TOZERO: 'To Zero',
+                #   cv2.THRESH_TOZERO_INV: 'To Zero inv.',
+                #   cv2.THRESH_TRIANGLE: 'Triangle',
+                  cv2.THRESH_OTSU: 'Otsu'
+                #   cv2.THRESH_MASK: 'Mask'
+                  }
+
+
+    def __init__(self, threshold_value: int = 127, max_value: int = 255, threshold_type: int = cv2.THRESH_BINARY):
+        super().__init__()
+        self.threshold_value = threshold_value
+        self.threshold_type = threshold_type
+        self.max_value = max_value
+
+    def description(self) -> str:
+        return f'{self.display} (thresh={self.threshold_value:.1f}, max={self.max_value}, type={self.threshold_type})'
+
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        if not self.enabled:
+            return image
+        # if image.ndim == 3 and image.shape[2] in [3, 4]:
+        #     ycrcb = cv2.cvtColor(image[:, :, :3], cv2.COLOR_RGB2YCrCb)
+        #     yeq = self.clahe.apply(ycrcb[:, :, 0])
+        #     ycrcb[:, :, 0] = yeq
+        #     return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2RGB)
+        
+        # else:
+        #     return self.clahe.apply(image)
+        _, thresh = cv2.threshold(image, self.threshold_value, self.max_value, self.threshold_type)
+        return thresh
+
+    #TODO def set_PARAM
+
+    def configure(self, config: dict) -> None:
+        super().configure(config)
+        if 'threshold_value' in config:
+            self.threshold_value = config["threshold_value"]
+        if 'threshold_type' in config:
+            self.tile_size = tuple(config["threshold_type"])
+        if 'max_value' in config:
+            self.tile_size = tuple(config["max_value"])
+
+    def freeze(self) -> dict:
+        d = {'threshold_value': self.threshold_value,
+             'threshold_type': self.threshold_type,
+             'max_value': self.max_value}
+        d.update(super().freeze())
+        return d
+
+    def __repr__(self) -> str:
+        return f'{self.display} (t={self.threshold_value:.1f}, max={self.max_value}, {self.threshold_type})'
+
 # List of all available preprocessing operations.
 # Since we want to provide a custom ordering of the operations in the UI, this
 # list cannot be retrieved automatically (e.g. via inspect)
 AVAILABLE_PREPROCESSOR_OPERATIONS = [
     PreProcOpGrayscale, PreProcOpGammaCorrection,
-    PreProcOpHistEq, PreProcOpCLAHE
+    PreProcOpHistEq, PreProcOpCLAHE,
+    PreProcOpThreshold
 ]
 
 
@@ -309,12 +386,23 @@ if __name__ == '__main__':
     from vito import imvis
     img = imutils.imread(os.path.join(os.path.dirname(__file__), '..', '..', 'sandbox', 'flamingo.jpg'))
 
+
+    gray = PreProcOpGrayscale().apply(img)
+    for ttype in PreProcOpThreshold.type_names:
+        op = PreProcOpThreshold(threshold_type=ttype)
+        result = op.apply(gray)
+        imvis.imshow(result, PreProcOpThreshold.type_names[ttype], wait_ms=-1)
+
+    assert False
+
     pp = Preprocessor()
-    pp.loadTOML(os.path.join(os.path.dirname(__file__), '..', '..', 'sandbox', 'sandbox.toml'))
+    # pp.loadTOML(os.path.join(os.path.dirname(__file__), '..', '..', 'sandbox', 'sandbox.toml'))
     # pp.add_operation(op_map['histeq']())
     # pp.add_operation(PreProcOpGammaCorrection(2))
     # pp.add_operation(PreProcOpHistEq())
     # pp.add_operation(PreProcOpGrayscale())
+
+
 
     imvis.imshow(img, wait_ms=10)
     img1 = pp.apply(img)

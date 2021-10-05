@@ -109,7 +109,11 @@ class PreProcStepSliderWidget(SliderWidget):
         self.preprocessor = None
         self.onImageSourceChanged(image_source)
         self.onPreprocessorChanged(preprocessor)
-    
+
+    def changeToLastStep(self):
+        idx = self.preprocessor.num_operations() if self.preprocessor is not None else 1
+        self.setValue(idx)
+
     @Slot(ImageSource)
     def onImageSourceChanged(self, image_source: ImageSource) -> None:
         self.image_source = image_source
@@ -120,13 +124,12 @@ class PreProcStepSliderWidget(SliderWidget):
         self.preprocessor = preprocessor
         self.setEnabled(self.image_source is not None and self.preprocessor is not None)
         if self.preprocessor is not None:
-            # Adjust range (change step to max number of steps if it was at max previously, too)
             self._max_value = self.preprocessor.num_operations()
             self._num_steps = max(1, self._max_value - 1)
             self._step_size = (self._max_value - 1) / self._num_steps
+            self._slider.setEnabled(self._max_value > self._min_value)
             self._slider.setMinimum(0)
             self._slider.setMaximum(self._num_steps)
-            self._slider.setEnabled(self._max_value > self._min_value)
 
 
 class ImageComboboxWidget(QComboBox):
