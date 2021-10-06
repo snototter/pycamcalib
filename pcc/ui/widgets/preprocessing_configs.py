@@ -160,8 +160,8 @@ class AdaptiveThresholdConfigWidget(QWidget):
         self.type_widget.valueChanged.connect(self._updateParameters)
         layout_main.addWidget(self.type_widget)
 
-        # Block size must be odd and > 0
-        self.block_size_widget = ValidatedIntegerInputWidget('Block size:', self.operation.block_size, 1,
+        # Block size must be odd and > 1
+        self.block_size_widget = ValidatedIntegerInputWidget('Block size:', self.operation.block_size, 3,
                                                              divisible_by=2, division_remainder=1)
         self.block_size_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.block_size_widget)
@@ -171,13 +171,13 @@ class AdaptiveThresholdConfigWidget(QWidget):
         layout_main.addWidget(self.cval_widget)
 
         button = QPushButton('Apply')
-        button.clicked.connect(self._updateParameters)
+        button.clicked.connect(lambda: self._updateParameters(True))
         layout_main.addWidget(button)
 
         layout_main.addStretch()
     
     @Slot()
-    def _updateParameters(self):
+    def _updateParameters(self, display_message=False):
         if self.max_widget.valid() and self.block_size_widget.valid() and self.cval_widget.valid():
             self.operation.set_max_value(self.max_widget.value())
             self.operation.set_threshold_type(self.type_widget.value()[0])
@@ -186,7 +186,8 @@ class AdaptiveThresholdConfigWidget(QWidget):
             self.operation.set_C(self.cval_widget.value())
             self.configurationUpdated.emit()
         else:
-            displayError('Configuration is invalid, please change the parameters.', parent=self)
+            if display_message:
+                displayError('Configuration is invalid, please change the parameters.', parent=self)
 
 
 class PreProcOpConfigDialog(QDialog):
@@ -258,10 +259,10 @@ image which will be passed as input to the operation's 'apply()' method)."""
         gb_preview.layout().addWidget(self.preview)
 
         # Accept/reject buttons at the bottom
-        btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btn_box.accepted.connect(self.accept)
-        btn_box.rejected.connect(self.reject)
-        layout_main.addWidget(btn_box)
+        self.btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.btn_box.accepted.connect(self.accept)
+        self.btn_box.rejected.connect(self.reject)
+        layout_main.addWidget(self.btn_box)
         self.setMinimumWidth(600)
 
     def setSelectedPreviewIndex(self, index: int) -> None:

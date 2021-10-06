@@ -1,6 +1,6 @@
 """Common/basic UI widgets & functionality."""
 from typing import List, Sequence, Tuple
-from PySide2.QtCore import QLocale, Qt, Signal, Slot
+from PySide2.QtCore import QEvent, QLocale, QObject, Qt, Signal, Slot
 from PySide2.QtGui import QDoubleValidator, QFontDatabase, QIntValidator, QValidator
 from PySide2.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QProgressBar, QSizePolicy, QWidget
 
@@ -51,6 +51,7 @@ class ValidatedFloatInputWidget(QWidget):
                  min_val: float = None, max_val: float = None, decimals: int = None,
                  parent=None):
         super().__init__(parent)
+        self.decimals = decimals
         layout = QHBoxLayout()
         self.setLayout(layout)
         if label_text is not None:
@@ -64,6 +65,7 @@ class ValidatedFloatInputWidget(QWidget):
         self.line_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.line_edit.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.line_edit.setAlignment(Qt.AlignRight)
+        self.line_edit.installEventFilter(self)
         self.line_edit.editingFinished.connect(self.editingFinished)
         layout.addWidget(self.line_edit)
         # Add input validation to allow only floating point numbers. 
@@ -83,10 +85,7 @@ class ValidatedFloatInputWidget(QWidget):
         self.line_edit.setValidator(self.validator)
         self.line_edit.textEdited.connect(self._textEdited)
         if initial_value is not None:
-            fmt = '{:' + (f'.{decimals}' if decimals is not None else '') + 'f}'
-            text = fmt.format(initial_value)
-            self.line_edit.setText(text)
-            self._textEdited(text)
+            self._setValue(initial_value)
 
     def valid(self) -> bool:
         return self.is_valid
@@ -96,12 +95,27 @@ class ValidatedFloatInputWidget(QWidget):
             return float(self.line_edit.text())
         else:
             return None
+    
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Wheel and watched == self.line_edit:
+            # Use mouse wheel to increase/decrease the value
+            val = float(self.line_edit.text())
+            if val is not None:
+                fac = 10 if event.modifiers() & Qt.ControlModifier else 1
+                val = val + fac * (-1.0 if event.delta() < 0 else +1.0)
+                self._setValue(val)
+            return True
+        return super().eventFilter(watched, event)
+
+    def _setValue(self, value):
+        fmt = '{:' + (f'.{self.decimals}' if self.decimals is not None else '') + 'f}'
+        text = fmt.format(value)
+        self.line_edit.setText(text)
+        self._textEdited(text)
 
     @Slot(str)
     def _textEdited(self, text):
         res, modified_text, _ = self.validator.validate(text, 0)
-        # print(f'Validated "{text}": {res}', self.validator.bottom(), self.validator.top())
-
         if res == QValidator.Acceptable:
             self.is_valid = True
             val = float(modified_text)
@@ -110,10 +124,6 @@ class ValidatedFloatInputWidget(QWidget):
         elif res in [QValidator.Invalid, QValidator.Intermediate]:
             self.is_valid = False
             self.line_edit.setStyleSheet("border: 2px solid red;")
-        #TODO not needed so far (un/polish trick) https://forum.qt.io/topic/120591/change-style-sheet-on-the-fly/10
-        #https://8bitscoding.github.io/qt/ui/dynamic-p-and-s/
-        #self.line_edit.style().unpolish(self.line_edit)
-        #self.line_edit.style().polish(self.line_edit)
 
 
 class ValidatedIntegerInputWidget(QWidget):
@@ -138,6 +148,7 @@ class ValidatedIntegerInputWidget(QWidget):
         self.line_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.line_edit.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.line_edit.setAlignment(Qt.AlignRight)
+        self.line_edit.installEventFilter(self)
         self.line_edit.editingFinished.connect(self.editingFinished)
         layout.addWidget(self.line_edit)
         self.is_valid = True
@@ -151,9 +162,18 @@ class ValidatedIntegerInputWidget(QWidget):
         self.line_edit.setValidator(self.validator)
         self.line_edit.textEdited.connect(self._textEdited)
         if initial_value is not None:
-            text = str(initial_value)
-            self.line_edit.setText(text)
-            self._textEdited(text)
+            self._setValue(initial_value)
+    
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Wheel and watched == self.line_edit:
+            # Use mouse wheel to increase/decrease the value
+            val = int(self.line_edit.text())
+            if val is not None:
+                fac = 10 if event.modifiers() & Qt.ControlModifier else 1
+                val = val + fac * (-1 if event.delta() < 0 else +1)
+                self._setValue(val)
+            return True
+        return super().eventFilter(watched, event)
 
     def valid(self) -> bool:
         return self.is_valid
@@ -163,6 +183,11 @@ class ValidatedIntegerInputWidget(QWidget):
             return int(self.line_edit.text())
         else:
             return None
+
+    def _setValue(self, value: int) -> None:
+        text = str(value)
+        self.line_edit.setText(text)
+        self._textEdited(text)
 
     @Slot(str)
     def _textEdited(self, text):
