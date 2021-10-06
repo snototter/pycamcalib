@@ -10,20 +10,6 @@ from vito import imutils
 # * maybe add naive contrast adjustment I*alpha + beta https://towardsdatascience.com/exploring-image-processing-techniques-opencv-4860006a243
 
 
-# @param src Source 8-bit single-channel image.
-# @param maxValue Non-zero value assigned to the pixels for which the condition is satisfied
-# @param adaptiveMethod Adaptive thresholding algorithm to use, see cv::AdaptiveThresholdTypes
-# @param thresholdType Thresholding type that must be either THRESH_BINARY or THRESH_BINARY_INV,
-# @param blockSize Size of a pixel neighborhood that is used to calculate a threshold value for the
-# pixel: 3, 5, 7, and so on.
-# @param C Constant subtracted from the mean or weighted mean (see the details below). Normally, it
-# is positive but may be zero or negative as well.
-# CV_EXPORTS_W void adaptiveThreshold( InputArray src, OutputArray dst,
-#                                      double maxValue, int adaptiveMethod,
-#                                      int thresholdType, int blockSize, double C );
-
-
-
 _logger = logging.getLogger('Preprocessing')
 
 
@@ -145,7 +131,7 @@ class PreProcOpGammaCorrection(PreProcOperationBase):
 
 
 class PreProcOpHistEq(PreProcOperationBase):
-    """Applies standard (fixed) histogram equalization.
+    """Applies standard (global) histogram equalization.
 
 For RGB images, equalization is applied on the intensity (Y) channel after
 color conversion to YCrCb."""
@@ -176,10 +162,11 @@ class PreProcOpCLAHE(PreProcOperationBase):
 
     def __init__(self, clip_limit: float = 2.0, tile_size: typing.Tuple[int, int] = (8, 8)):
         super().__init__()
-        self.clip_limit = clip_limit
-        self.tile_size = tile_size
         self.clahe = None
-        self._set_clahe()
+        self.clip_limit = None
+        self.tile_size = None
+        self.set_clip_limit(clip_limit)
+        self.set_tile_size(tile_size)
 
     def description(self) -> str:
         return f'{self.display} (clip={self.clip_limit:.1f}, tile={self.tile_size})'
@@ -224,13 +211,11 @@ class PreProcOpCLAHE(PreProcOperationBase):
         return f'{self.name}(cl={self.clip_limit:.1f}, ts={self.tile_size})'
 
 
-# CV_EXPORTS_W double threshold( InputArray src, OutputArray dst,
-#                                double thresh, double maxval, int type );
 class PreProcOpThreshold(PreProcOperationBase):
-    """Applies simple thresholding"""
+    """Applies global thresholding"""
 
     name = 'thresholding'
-    display = 'Thresholding'
+    display = 'Global Thresholding'
 
     threshold_types = [(cv2.THRESH_BINARY, 'Binary'),
                        (cv2.THRESH_BINARY_INV, 'Binary inv.'),
@@ -242,9 +227,13 @@ class PreProcOpThreshold(PreProcOperationBase):
 
     def __init__(self, threshold_value: int = 127, max_value: int = 255, threshold_type: int = cv2.THRESH_BINARY):
         super().__init__()
-        self.threshold_value = threshold_value
-        self.threshold_type = threshold_type
-        self.max_value = max_value
+        self.threshold_value = None
+        self.threshold_type = None
+        self.max_value = None
+        # Use setters because of their sanity checks (where required)
+        self.set_threshold_value(threshold_value)
+        self.set_threshold_type(threshold_type)
+        self.set_max_value(max_value)
 
     def description(self) -> str:
         return f'{self.display} (thresh={self.threshold_value}, max={self.max_value}, type={self._type2str()})'
@@ -297,13 +286,115 @@ class PreProcOpThreshold(PreProcOperationBase):
         return f'{self.display} (th={self.threshold_value}, max={self.max_value}, {self._type2str()})'
 
 
+class PreProcOpAdaptiveThreshold(PreProcOperationBase):
+    """Applies adaptive thresholding"""
+
+    name = 'adaptive-thresholding'
+    display = 'Adaptive Thresholding'
+
+    threshold_types = [(cv2.THRESH_BINARY, 'Binary'),
+                       (cv2.THRESH_BINARY_INV, 'Binary inv.')]
+
+    methods = [(cv2.ADAPTIVE_THRESH_MEAN_C, 'Mean'),
+               (cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 'Gaussian')]
+
+    def __init__(self, max_value: int = 255, method: int = cv2.ADAPTIVE_THRESH_MEAN_C,
+                 threshold_type: int = cv2.THRESH_BINARY, block_size: int = 5,
+                 C: float = 0):
+        super().__init__()
+        self.max_value = None
+        self.method = None
+        self.threshold_type = None
+        self.block_size = None
+        self.C = None
+        # Use setter to perform sanity checks #TODO EVERYWHERE
+        self.set_max_value(max_value)
+        self.set_method(method)
+        self.set_threshold_type(threshold_type)
+        self.set_block_size(block_size)
+        self.set_C(C)
+
+    def description(self) -> str:
+        return f'{self.display} (max={self.max_value}, {self._method2str()}, {self._type2str()}, {self.block_size}x{self.block_size}, C={self.C:.1f})'
+
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        if not self.enabled:
+            return image
+        # Ensure single-channel input
+        if image.ndim == 3:
+            image = imutils.grayscale(image)
+        return cv2.adaptiveThreshold(image, self.max_value, self.method, self.threshold_type, self.block_size, self.C)
+
+    def set_max_value(self, max_value: int) -> None:
+        self.max_value = max_value
+
+    def set_threshold_type(self, ttype: int) -> None:
+        if ttype not in [tt[0] for tt in PreProcOpAdaptiveThreshold.threshold_types]:
+            raise ValueError(f'Threshold type ({ttype}) is not supported')
+        self.threshold_type = ttype
+
+    def set_method(self, method: int) -> None:
+        if method not in [m[0] for m in PreProcOpAdaptiveThreshold.methods]:
+            raise ValueError(f'Threshold method ({method}) is not supported')
+        self.method = method
+
+    def set_C(self, C: int) -> None:
+        self.C = C
+
+    def set_block_size(self, block_size: int) -> None:
+        if block_size % 2 == 0:
+            raise ValueError(f'Block size ({block_size}) must be odd')
+        self.block_size = block_size
+
+    def configure(self, config: dict) -> None:
+        super().configure(config)
+        if 'method' in config:
+            self.set_method(config['method'])
+        if 'threshold_type' in config:
+            self.set_threshold_type(config['threshold_type'])
+        if 'max_value' in config:
+            self.set_max_value(config['max_value'])
+        if 'block_size' in config:
+            self.set_block_size(config['block_size'])
+        if 'C' in config:
+            self.set_C(config['C'])
+
+    def freeze(self) -> dict:
+        d = {'max_value': self.max_value,
+             'method': self.method,
+             'threshold_type': self.threshold_type,
+             'block_size': self.block_size,
+             'C': self.C}
+        d.update(super().freeze())
+        return d
+
+    def _type2str(self, threshold_type: int = None) -> str:
+        if threshold_type is None:
+            threshold_type = self.threshold_type
+        for tt, ts in PreProcOpThreshold.threshold_types:
+            if tt == threshold_type:
+                return ts
+        raise ValueError(f'Threshold type ({threshold_type}) is not supported')
+
+    def _method2str(self, method: int = None) -> str:
+        if method is None:
+            method = self.method
+        for mt, ms in PreProcOpAdaptiveThreshold.methods:
+            if mt == method:
+                return ms
+        raise ValueError(f'Threshold method ({method}) is not supported')
+
+    def __repr__(self) -> str:
+        return f'{self.display} (max={self.max_value}, {self._method2str()}, {self._type2str()}, {self.block_size}x{self.block_size}, C={self.C:.1f})'
+
+
 # List of all available preprocessing operations.
 # Since we want to provide a custom ordering of the operations in the UI, this
 # list cannot be retrieved automatically (e.g. via inspect)
 AVAILABLE_PREPROCESSOR_OPERATIONS = [
     PreProcOpGrayscale, PreProcOpGammaCorrection,
     PreProcOpHistEq, PreProcOpCLAHE,
-    PreProcOpThreshold
+    PreProcOpThreshold, PreProcOpAdaptiveThreshold
 ]
 
 
