@@ -121,7 +121,9 @@ class ValidatedIntegerInputWidget(QWidget):
     valueChanged = Signal()
 
     def __init__(self, label_text: str, initial_value: int = None,
-                 min_val: int = None, max_val: int = None, parent=None):
+                 min_val: int = None, max_val: int = None,
+                 divisible_by: int = None, division_remainder: int = 0,
+                 parent=None):
         super().__init__(parent)
         layout = QHBoxLayout()
         self.setLayout(layout)
@@ -139,6 +141,8 @@ class ValidatedIntegerInputWidget(QWidget):
         self.line_edit.editingFinished.connect(self.editingFinished)
         layout.addWidget(self.line_edit)
         self.is_valid = True
+        self.divisible_by = divisible_by
+        self.division_remainder = division_remainder
         self.validator = QIntValidator()
         if min_val is not None:
             self.validator.setBottom(min_val)
@@ -168,9 +172,14 @@ class ValidatedIntegerInputWidget(QWidget):
         if res == QValidator.Acceptable:
             self.is_valid = True
             val = int(modified_text)
-            self.line_edit.setStyleSheet("border: 2px solid green;")
-            self.valueChanged.emit()
-        elif res in [QValidator.Invalid, QValidator.Intermediate]:
+            # Check if the user wants the number to be divisible by X, giving
+            # some specified remainder
+            if self.divisible_by is not None and val % self.divisible_by != self.division_remainder:
+                res = QValidator.Invalid
+            else:
+                self.line_edit.setStyleSheet("border: 2px solid green;")
+                self.valueChanged.emit()
+        if res in [QValidator.Invalid, QValidator.Intermediate]:
             self.is_valid = False
             self.line_edit.setStyleSheet("border: 2px solid red;")
 

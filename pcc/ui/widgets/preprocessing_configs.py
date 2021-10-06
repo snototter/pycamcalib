@@ -6,7 +6,7 @@ from PySide2.QtWidgets import QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
 
 from pcc.ui.widgets.preprocessing_preview import Previewer, ImageComboboxWidget
 
-from ...processing import PreProcOpGammaCorrection, PreProcOpCLAHE, PreProcOpThreshold
+from ...processing import PreProcOpGammaCorrection, PreProcOpCLAHE, PreProcOpThreshold, PreProcOpAdaptiveThreshold
 from .common import ValidatedIntegerInputWidget, displayError, ValidatedFloatInputWidget, ValidatedSizeInputWidget, SelectionInputWidget
 
 
@@ -119,7 +119,75 @@ class ThresholdConfigWidget(QWidget):
             self.operation.set_threshold_type(self.type_widget.value()[0])
             self.configurationUpdated.emit()
         else:
-            displayError('Configuration is invalid, please validate gamma.', parent=self)
+            displayError('Configuration is invalid, please change the parameters.', parent=self)
+
+
+class AdaptiveThresholdConfigWidget(QWidget):
+    operation_name = PreProcOpAdaptiveThreshold.name
+
+    configurationUpdated = Signal()
+
+    def __init__(self, operation, parent=None):
+        super().__init__(parent)
+        self.operation = operation
+
+        layout_main = QVBoxLayout()
+        self.setLayout(layout_main)
+        
+        self.max_widget = ValidatedIntegerInputWidget('Max. Value:', self.operation.max_value, 0, 255)
+        self.max_widget.editingFinished.connect(self._updateParameters)
+        layout_main.addWidget(self.max_widget)
+
+        choices = list()
+        initial_selection = 0
+        for idx in range(len(PreProcOpAdaptiveThreshold.methods)):
+            method = PreProcOpAdaptiveThreshold.methods[idx]
+            if self.operation.method == method[0]:
+                initial_selection = idx
+            choices.append(method)
+        self.method_widget = SelectionInputWidget('Method:', choices, initial_selection)
+        self.method_widget.valueChanged.connect(self._updateParameters)
+        layout_main.addWidget(self.method_widget)
+
+        choices = list()
+        initial_selection = 0
+        for idx in range(len(PreProcOpAdaptiveThreshold.threshold_types)):
+            ttype = PreProcOpAdaptiveThreshold.threshold_types[idx]
+            if self.operation.threshold_type == ttype[0]:
+                initial_selection = idx
+            choices.append(ttype)
+        self.type_widget = SelectionInputWidget('Type:', choices, initial_selection)
+        self.type_widget.valueChanged.connect(self._updateParameters)
+        layout_main.addWidget(self.type_widget)
+
+        # Block size must be odd and > 0
+        self.block_size_widget = ValidatedIntegerInputWidget('Block size:', self.operation.block_size, 1,
+                                                             divisible_by=2, division_remainder=1)
+        self.block_size_widget.editingFinished.connect(self._updateParameters)
+        layout_main.addWidget(self.block_size_widget)
+
+        self.cval_widget = ValidatedFloatInputWidget('Constant:', self.operation.C, decimals=1)
+        self.cval_widget.editingFinished.connect(self._updateParameters)
+        layout_main.addWidget(self.cval_widget)
+
+        button = QPushButton('Apply')
+        button.clicked.connect(self._updateParameters)
+        layout_main.addWidget(button)
+
+        layout_main.addStretch()
+    
+    @Slot()
+    def _updateParameters(self):
+        if self.max_widget.valid() and self.block_size_widget.valid() and self.cval_widget.valid():
+            self.operation.set_max_value(self.max_widget.value())
+            self.operation.set_threshold_type(self.type_widget.value()[0])
+            self.operation.set_method(self.method_widget.value()[0])
+            self.operation.set_block_size(self.block_size_widget.value())
+            self.operation.set_C(self.cval_widget.value())
+            self.configurationUpdated.emit()
+        else:
+            displayError('Configuration is invalid, please change the parameters.', parent=self)
+
 
 class PreProcOpConfigDialog(QDialog):
     """A dialog to configure preprocessing operations.
