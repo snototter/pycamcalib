@@ -406,6 +406,7 @@ applied subsequently to a given image via 'process()'.
     """
     def __init__(self):
         self.operations = list()
+        self.enabled = True
         self._operation_map = {opcls.name: opcls for opcls in AVAILABLE_PREPROCESSOR_OPERATIONS}
 
     def num_operations(self) -> int:
@@ -417,7 +418,10 @@ applied subsequently to a given image via 'process()'.
 
     def set_enabled(self, index: int, enabled: bool) -> None:
         """Enable/disable the operation at the given index."""
-        self.operations[index].set_enabled(enabled)
+        if index is None:
+            self.enabled = enabled
+        else:
+            self.operations[index].set_enabled(enabled)
 
     def swap_previous(self, index: int) -> None:
         """Swap operation at index with operation at index-1."""
@@ -437,6 +441,8 @@ applied subsequently to a given image via 'process()'.
         num_steps will be applied."""
         if image is None:
             return None
+        if not self.enabled:
+            return image
         for step, op in enumerate(self.operations):
             if num_steps >= 0 and step >= num_steps:
                 break

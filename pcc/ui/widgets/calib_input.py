@@ -2,7 +2,7 @@ import pathlib
 from PySide2.QtCore import QEvent, QSize, Qt, Signal, Slot
 from PySide2.QtGui import QColor, QFont, QIcon, QImage, QPainter, QPen, QPixmap
 from PySide2.QtWidgets import QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QSpacerItem, QToolButton, QWidget
-from .image_view import ImageLabel
+from .image_view import ImageLabel, ImageViewer
 from ..image_conversion import pixmapFromNumpy
 from ...patterns import PATTERNS
 
@@ -106,7 +106,7 @@ def shortenPath(element, path_str):
             width_text = element.fontMetrics().boundingRect(text).width()
         return text
 
-#TODO move pattern thumbnail below combobox!
+
 class CalibrationInputWidget(QWidget):
     """UI to select input image folder & configure the calibration target."""
 
@@ -127,13 +127,13 @@ class CalibrationInputWidget(QWidget):
         self._btn_folder.setIconSize(icon_size)
         self._btn_folder.setToolTip('Open folder')  #TODO should we register shortcut in main widget (Ctrl+O)?
         self._btn_folder.setMinimumHeight(icon_size.height())
-        self._btn_folder.clicked.connect(self._selectImageFolder)
+        self._btn_folder.clicked.connect(self._onSelectImageFolder)
         layout.addWidget(self._btn_folder, 0, 0, 1, 1, Qt.AlignTop)
 
         self._lbl_folder = QLabel('')
         self._lbl_folder.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Minimum)
         self._lbl_folder.setMinimumWidth(50)
-        layout.addWidget(self._lbl_folder, 0, 1, 1, 2, Qt.AlignTop)
+        layout.addWidget(self._lbl_folder, 0, 1, 1, 1)#, Qt.AlignTop)
         
         # 2nd row: calibration pattern selection, configuration & thumbnail
         self._pattern_selection = QComboBox()
@@ -141,55 +141,56 @@ class CalibrationInputWidget(QWidget):
         for k in PATTERNS:
             self._pattern_selection.addItem(k)
         self._selected_pattern_idx = 0
-        self._pattern_selection.activated.connect(self._patternSelectionChanged)
+        self._pattern_selection.activated.connect(self._onPatternSelectionChanged)
 
         self._btn_pattern_config = QPushButton('Configure') #TODO replace by settings wheel
-        self._btn_pattern_config.clicked.connect(self._configurePattern)
-        layout.addWidget(self._btn_pattern_config, 1, 1, Qt.AlignTop)
+        self._btn_pattern_config.clicked.connect(self._onConfigurePattern)
+        # layout.addWidget(self._btn_pattern_config, 1, 1, Qt.AlignTop)
+        layout.addWidget(self._btn_pattern_config, 2, 0, Qt.AlignTop)
 
+        # self._thumbnail = ImageViewer()
         self._thumbnail = ImageLabel(center_vertical=False)
         self._thumbnail.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(self._thumbnail, 1, 2, 3, 1)# don't set Qt.AlignTop
+        layout.addWidget(self._thumbnail, 1, 1, 3, 1)  # Don't set any alignment
+        # layout.addWidget(self._thumbnail, 2, 0, 1, 2)
 
         # 3rd row: spacer
         vspace = QSpacerItem(20, 20, QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addItem(vspace, 2, 0, 1, 2, Qt.AlignTop)
+        layout.addItem(vspace, 3, 0, 1, 1, Qt.AlignTop)
+        # layout.addItem(vspace, 2, 0, 1, 2, Qt.AlignTop)
         self.setLayout(layout)
 
     @Slot(int)
-    def _patternSelectionChanged(self, current_index):
+    def _onPatternSelectionChanged(self, current_index):
         # Reset thumbnail if pattern actually changed
         if current_index != self._selected_pattern_idx:
             self._thumbnail.setPixmap(None)
+            #TODO update preview (and reset scale)
             self.update()
-        # else:
-        #     #TODO
-        #     import numpy as np
-        #     tmp = np.zeros((200, 150, 3), dtype=np.uint8)
-        #     tmp[:, :, 2] = 255
-        #     self._thumbnail.setPixmap(pixmapFromNumpy(tmp))
         self._selected_pattern_idx = current_index
 
     @Slot()
-    def _configurePattern(self):
+    def _onConfigurePattern(self):
         print(f'TODO configure {self._pattern_selection.currentIndex()}')
         import numpy as np
         tmp = np.zeros((200, 150, 3), dtype=np.uint8)
         tmp[:, :, 2] = 255
+        # self._thumbnail.showImage(tmp)
+        # self._thumbnail.scaleToFitWindow()
         self._thumbnail.setPixmap(pixmapFromNumpy(tmp))
         self.update()
         self.patternConfigurationChanged.emit()
 
     @Slot()
-    def _selectImageFolder(self):
+    def _onSelectImageFolder(self):
         # Let the user select a directory
         selection = str(QFileDialog.getExistingDirectory(self, 'Select Calibration Image Directory'))
         if len(selection) > 0 and pathlib.Path(selection).exists():
             self._folder = selection
             self.imageFolderSelected.emit(self._folder)
-        self._updateFolderLabel()
+        self._onUpdateFolderLabel()
 
-    def _updateFolderLabel(self):
+    def _onUpdateFolderLabel(self):
         # Display the selected directory path on the label
         txt = '' if self._folder is None else self._folder
         self._lbl_folder.setText(shortenPath(self._lbl_folder, txt))
@@ -198,10 +199,10 @@ class CalibrationInputWidget(QWidget):
     def eventFilter(self, source, event):
         if (event.type() == QEvent.Resize):
             # Adjust text display
-            self._updateFolderLabel()
+            self._onUpdateFolderLabel()
         return super().eventFilter(source, event)
 
     def resetImageFolder(self):
         """Use this to manually/programmatically clear the selected folder."""
         self._folder = None
-        self._updateFolderLabel()
+        self._onUpdateFolderLabel()

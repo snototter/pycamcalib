@@ -6,7 +6,7 @@ import sys
 import time
 import traceback
 from PySide2 import QtWidgets
-from PySide2.QtCore import QTimer, Qt, Signal, Slot
+from PySide2.QtCore import QRect, QSize, QTimer, Qt, Signal, Slot
 from PySide2.QtWidgets import QApplication, QDesktopWidget, QGridLayout, QGroupBox, QHBoxLayout, QMainWindow, QProgressBar, QSizePolicy, QSplitter, QStatusBar, QStyleFactory, QToolBar, QVBoxLayout, QWidget
 from numpy import disp
 
@@ -46,16 +46,17 @@ class MonoCalibrationGui(QMainWindow):
         self.image_source = None
         self.calibration_pattern = None
         self.preprocessor = None
+        initial_window_size = QSize(QDesktopWidget().availableGeometry(self).size() *0.6) #TODO* 0.85)
 
         # self.createActions()
         # self.createMenuBar()
         # self.createToolbars()
         self._createStatusBar()
-        self._initLayout()
+        self._initLayout(initial_window_size)
         # toolbar_imgsrc = QToolBar('Image Source', self)
         # self.addToolBar(Qt.TopToolBarArea, toolbar_imgsrc)
 
-        self.resize(QDesktopWidget().availableGeometry(self).size() * 0.85)
+        self.resize(initial_window_size)
     
     # def createActions(self):
     #     pass
@@ -66,7 +67,7 @@ class MonoCalibrationGui(QMainWindow):
     # def createToolbars(self):
     #     pass
     
-    def _initLayout(self):
+    def _initLayout(self, initial_window_size: QSize):
         layout_main = QVBoxLayout()
         splitter_main = QSplitter(Qt.Vertical)
         layout_main.addWidget(splitter_main)
@@ -76,7 +77,6 @@ class MonoCalibrationGui(QMainWindow):
         #### Image selection & pattern specification
         layout_row1 = QGridLayout()
         groupbox_input = QGroupBox("Images && Pattern")
-        # groupbox_input.setCheckable(True) # TODO test (could be used to implement a collapsible box)
         groupbox_input.setLayout(QVBoxLayout())
         # groupbox_input.setStyleSheet("border: 1px solid gray; border-color: #ff17365d;")
         splitter_row1.addWidget(groupbox_input)
@@ -90,14 +90,16 @@ class MonoCalibrationGui(QMainWindow):
         #### Preprocessing pipeline
         groupbox_preproc = QGroupBox("Preprocessing")
         groupbox_preproc.setLayout(QVBoxLayout())
+        groupbox_preproc.setCheckable(True)
         self.preproc_configurator = PreprocessingSelector(self.image_source, message_callback=self.status_bar.showMessage)
         self.preproc_configurator.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        groupbox_preproc.toggled.connect(self.preproc_configurator.onPreprocPipelineToggled)
         self._imageSourceChanged.connect(self.preproc_configurator.onImageSourceChanged)
         groupbox_preproc.layout().addWidget(self.preproc_configurator)
+        groupbox_preproc.setChecked(False)
         splitter_row1.addWidget(groupbox_preproc)
 
-        #TODO use gridview instead of splitter for first row, because the following doesn't work:
-        # splitter_row1.setSizes([1, 4])
+        splitter_row1.setSizes([initial_window_size.width() * 0.3, initial_window_size.width() * 0.7])
         
         ########### 2nd row (image gallery)
         #TODO connect _imageSourceChanged, preproc_config.preprocpipelineChanged
@@ -111,7 +113,7 @@ class MonoCalibrationGui(QMainWindow):
         self.groupbox_imgview.layout().addWidget(PlaceholderWidget())
         self.groupbox_imgview.setEnabled(False)
 
-        splitter_main.setSizes([1, 3]) #TODO add 3rd row (results)
+        splitter_main.setSizes([initial_window_size.height() * 0.4, initial_window_size.height() * 0.6])
         # splitter.setHandleWidth(80)
         # splitter.setOpaqueResize(False)
         # splitter.setStyleSheet("background-color: #333;")

@@ -194,7 +194,7 @@ class PreprocessingSelector(QWidget):
         self._initLayout(icon_size)
         self._updateList()
 
-    def _initLayout(self, icon_size):
+    def _initLayout(self, icon_size: QSize) -> None:
         layout_main = QGridLayout()
         self.setLayout(layout_main)
         ## 1st row: load/save + image selection
@@ -252,7 +252,7 @@ class PreprocessingSelector(QWidget):
         layout_main.setColumnStretch(0, 3)
         layout_main.setColumnStretch(1, 2)
 
-    def _updateList(self):
+    def _updateList(self) -> None:
         # Add all currently configured operations
         self.list_widget.clear()
         for idx, op in enumerate(self.preprocessor.operations):
@@ -286,7 +286,7 @@ class PreprocessingSelector(QWidget):
         self._btn_save.setEnabled(self.preprocessor.num_operations() > 0)
 
     @Slot(int)
-    def onMoveUp(self, op_idx):
+    def onMoveUp(self, op_idx: int) -> None:
         # User wants to change the order of operations
         self.preprocessor.swap_previous(op_idx)
         self.preprocessorChanged.emit(self.preprocessor)
@@ -298,14 +298,14 @@ class PreprocessingSelector(QWidget):
         # self.list_widget.insertItem(op_idx-1, item)
 
     @Slot(int)
-    def onMoveDown(self, op_idx):
+    def onMoveDown(self, op_idx: int) -> None:
         # User wants to change the order of operations
         self.preprocessor.swap_next(op_idx)
         self.preprocessorChanged.emit(self.preprocessor)
         self._updateList()
 
     @Slot(int)
-    def onRemove(self, op_idx):
+    def onRemove(self, op_idx: int) -> None:
         # User wants to remove an operation
         self.preprocessor.remove(op_idx)
         self.preprocessorChanged.emit(self.preprocessor)
@@ -313,13 +313,13 @@ class PreprocessingSelector(QWidget):
         self.step_slider.changeToLastStep()
 
     @Slot(int, bool)
-    def onOperationCheckboxToggled(self, op_idx, enabled):
+    def onOperationCheckboxToggled(self, op_idx: int, enabled: bool) -> None:
         # Checkbox enabled/disabled has been toggled
         self.preprocessor.set_enabled(op_idx, enabled)
         self.preprocessorChanged.emit(self.preprocessor)
 
     @Slot(PreProcOperationBase)
-    def onAddOperation(self, operation):
+    def onAddOperation(self, operation: PreProcOperationBase) -> None:
         # User wants to add another operation to the pipeline
         self.preprocessor.add_operation(operation)
         self.preprocessorChanged.emit(self.preprocessor)
@@ -327,12 +327,12 @@ class PreprocessingSelector(QWidget):
         self.step_slider.changeToLastStep()
 
     @Slot(int)
-    def onOperationConfigurationHasChanged(self, _):
+    def onOperationConfigurationHasChanged(self, _: int) -> None:
         self.preprocessorChanged.emit(self.preprocessor)
         self._updateList()
 
     @Slot()
-    def onLoadPipeline(self):
+    def onLoadPipeline(self) -> None:
         # Let the user select a TOML file. getOpenFileName also returns the applied file filter
         filename, _ = QFileDialog.getOpenFileName(self, 'Load Preprocessing Pipeline from TOML file',
                                                   self._previously_selected_folder,
@@ -355,7 +355,7 @@ class PreprocessingSelector(QWidget):
 
 
     @Slot()
-    def onSavePipeline(self):
+    def onSavePipeline(self) -> None:
         # Let the user select the output (TOML) file. getSaveFileName also returns the applied file filter
         filename, _ = QFileDialog.getSaveFileName(self, 'Choose TOML file to save Preprocessing Pipeline',
                                                   self._previously_selected_folder,
@@ -369,6 +369,11 @@ class PreprocessingSelector(QWidget):
             self.showMessage(f'Preprocessing pipeline has been saved to {filename}', 10000)
 
     @Slot(ImageSource)
-    def onImageSourceChanged(self, image_source: ImageSource):
+    def onImageSourceChanged(self, image_source: ImageSource) -> None:
         self.image_source = image_source
         self._imageSourceChanged.emit(image_source)
+
+    @Slot(bool)
+    def onPreprocPipelineToggled(self, preproc_enabled: bool) -> None:
+        self.preprocessor.set_enabled(None, preproc_enabled)
+        self.preprocessorChanged.emit(self.preprocessor)

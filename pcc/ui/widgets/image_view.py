@@ -7,7 +7,7 @@ Mostly copied from my iminspect package, with minor pcc-related modifications.
 
 import os
 from enum import Enum
-
+import numpy as np
 from PySide2.QtCore import Qt, QSize, QPointF, QPoint, QRect, Signal, Slot
 from PySide2.QtGui import QPainter, QPixmap, QCursor, QBrush, QColor, QPen, QPalette
 from PySide2.QtWidgets import QMainWindow, QApplication, QWidget, QScrollArea, QHBoxLayout, QVBoxLayout, QDialog
@@ -511,7 +511,7 @@ class ImageViewer(QScrollArea):
             for v in self._linked_viewers:
                 v.scrollAbsolute(value, orientation, notify_linked=False)
 
-    def showImage(self, img, reset_scale=True):
+    def showImage(self, img: np.ndarray, reset_scale: bool = True):
         pixmap = pixmapFromNumpy(img)
         self._img_np = img.copy()
         self._canvas.loadPixmap(pixmap)
