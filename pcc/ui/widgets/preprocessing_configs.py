@@ -13,7 +13,10 @@ from .common import ValidatedIntegerInputWidget, displayError, ValidatedFloatInp
 class GammaCorrectionConfigWidget(QWidget):
     operation_name = PreProcOpGammaCorrection.name
 
+    # Emitted whenever editing a single paramter has finished
     configurationUpdated = Signal()
+    # Invoked upon every (intermediate) change; contains the current validation result
+    valueChanged = Signal(bool)
 
     def __init__(self, operation, parent=None):
         super().__init__(parent)
@@ -22,28 +25,40 @@ class GammaCorrectionConfigWidget(QWidget):
         layout_main = QVBoxLayout()
         self.setLayout(layout_main)
         self.gamma_widget = ValidatedFloatInputWidget('Gamma:', self.operation.gamma, 0.01, 30, 2)
+        self.gamma_widget.valueChanged.connect(self._enableButton)
         self.gamma_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.gamma_widget)
 
-        button = QPushButton('Apply')
-        button.clicked.connect(self._updateParameters)
-        layout_main.addWidget(button)
+        self.button = QPushButton('Apply')
+        self.button.clicked.connect(self._updateParameters)
+        layout_main.addWidget(self.button)
 
         layout_main.addStretch()
+
+    def valid(self):
+        return self.gamma_widget.valid()
+    
+    @Slot()
+    def _enableButton(self):
+        valid = self.valid()
+        self.button.setEnabled(valid)
+        self.valueChanged.emit(valid)
     
     @Slot()
     def _updateParameters(self):
-        if self.gamma_widget.valid():
+        if self.valid():
             self.operation.set_gamma(self.gamma_widget.value())
             self.configurationUpdated.emit()
-        else:
-            displayError('Configuration is invalid, please validate gamma.', parent=self)
+        self._enableButton()
 
 
 class CLAHEConfigWidget(QWidget):
     operation_name = PreProcOpCLAHE.name
 
+    # Emitted whenever editing a single paramter has finished
     configurationUpdated = Signal()
+    # Invoked upon every (intermediate) change; contains the current validation result
+    valueChanged = Signal(bool)
 
     def __init__(self, operation, parent=None):
         super().__init__(parent)
@@ -52,33 +67,46 @@ class CLAHEConfigWidget(QWidget):
         layout_main = QVBoxLayout()
         self.setLayout(layout_main)
         self.clip_widget = ValidatedFloatInputWidget('Clip Limit:', self.operation.clip_limit, decimals=1)
+        self.clip_widget.valueChanged.connect(self._enableButton)
         self.clip_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.clip_widget)
 
         self.tile_widget = ValidatedSizeInputWidget('Tile Size:', self.operation.tile_size, (1, 1))
+        self.tile_widget.valueChanged.connect(self._enableButton)
         self.tile_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.tile_widget)
 
-        button = QPushButton('Apply')
-        button.clicked.connect(self._updateParameters)
-        layout_main.addWidget(button)
+        self.button = QPushButton('Apply')
+        self.button.clicked.connect(self._updateParameters)
+        layout_main.addWidget(self.button)
 
         layout_main.addStretch()
+
+    def valid(self):
+        return self.clip_widget.valid() and self.tile_widget.valid()
     
     @Slot()
+    def _enableButton(self):
+        valid = self.valid()
+        self.button.setEnabled(valid)
+        self.valueChanged.emit(valid)
+
+    @Slot()
     def _updateParameters(self):
-        if self.clip_widget.valid() and self.tile_widget.valid():
+        if self.valid():
             self.operation.set_clip_limit(self.clip_widget.value())
             self.operation.set_tile_size(self.tile_widget.value())
             self.configurationUpdated.emit()
-        else:
-            displayError('Configuration is invalid, please change the parameters.', parent=self)
+        self._enableButton()
 
 
 class ThresholdConfigWidget(QWidget):
     operation_name = PreProcOpThreshold.name
 
+    # Emitted whenever editing a single paramter has finished
     configurationUpdated = Signal()
+    # Invoked upon every (intermediate) change; contains the current validation result
+    valueChanged = Signal(bool)
 
     def __init__(self, operation, parent=None):
         super().__init__(parent)
@@ -87,10 +115,12 @@ class ThresholdConfigWidget(QWidget):
         layout_main = QVBoxLayout()
         self.setLayout(layout_main)
         self.threshold_widget = ValidatedIntegerInputWidget('Threshold:', self.operation.threshold_value, 0, 255)
+        self.threshold_widget.valueChanged.connect(self._enableButton)
         self.threshold_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.threshold_widget)
 
         self.max_widget = ValidatedIntegerInputWidget('Max. Value:', self.operation.max_value, 0, 255)
+        self.max_widget.valueChanged.connect(self._enableButton)
         self.max_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.max_widget)
 
@@ -102,30 +132,42 @@ class ThresholdConfigWidget(QWidget):
                 initial_selection = idx
             choices.append(ttype)
         self.type_widget = SelectionInputWidget('Type:', choices, initial_selection)
+        self.type_widget.valueChanged.connect(self._enableButton)
         self.type_widget.valueChanged.connect(self._updateParameters)
         layout_main.addWidget(self.type_widget)
 
-        button = QPushButton('Apply')
-        button.clicked.connect(self._updateParameters)
-        layout_main.addWidget(button)
+        self.button = QPushButton('Apply')
+        self.button.clicked.connect(self._updateParameters)
+        layout_main.addWidget(self.button)
 
         layout_main.addStretch()
+
+    def valid(self):
+        return self.threshold_widget.valid() and self.max_widget.valid()
+
+    @Slot()
+    def _enableButton(self):
+        valid = self.valid()
+        self.button.setEnabled(valid)
+        self.valueChanged.emit(valid)
     
     @Slot()
     def _updateParameters(self):
-        if self.threshold_widget.valid() and self.max_widget.valid():
+        if self.valid():
             self.operation.set_threshold_value(self.threshold_widget.value())
             self.operation.set_max_value(self.max_widget.value())
             self.operation.set_threshold_type(self.type_widget.value()[0])
             self.configurationUpdated.emit()
-        else:
-            displayError('Configuration is invalid, please change the parameters.', parent=self)
+        self._enableButton()
 
 
 class AdaptiveThresholdConfigWidget(QWidget):
     operation_name = PreProcOpAdaptiveThreshold.name
 
+    # Emitted whenever editing a single paramter has finished
     configurationUpdated = Signal()
+    # Invoked upon every (intermediate) change; contains the current validation result
+    valueChanged = Signal(bool)
 
     def __init__(self, operation, parent=None):
         super().__init__(parent)
@@ -135,6 +177,7 @@ class AdaptiveThresholdConfigWidget(QWidget):
         self.setLayout(layout_main)
         
         self.max_widget = ValidatedIntegerInputWidget('Max. Value:', self.operation.max_value, 0, 255)
+        self.max_widget.valueChanged.connect(self._enableButton)
         self.max_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.max_widget)
 
@@ -146,6 +189,7 @@ class AdaptiveThresholdConfigWidget(QWidget):
                 initial_selection = idx
             choices.append(method)
         self.method_widget = SelectionInputWidget('Method:', choices, initial_selection)
+        self.method_widget.valueChanged.connect(self._enableButton)
         self.method_widget.valueChanged.connect(self._updateParameters)
         layout_main.addWidget(self.method_widget)
 
@@ -157,37 +201,47 @@ class AdaptiveThresholdConfigWidget(QWidget):
                 initial_selection = idx
             choices.append(ttype)
         self.type_widget = SelectionInputWidget('Type:', choices, initial_selection)
+        self.type_widget.valueChanged.connect(self._enableButton)
         self.type_widget.valueChanged.connect(self._updateParameters)
         layout_main.addWidget(self.type_widget)
 
         # Block size must be odd and > 1
         self.block_size_widget = ValidatedIntegerInputWidget('Block size:', self.operation.block_size, 3,
                                                              divisible_by=2, division_remainder=1)
+        self.block_size_widget.valueChanged.connect(self._enableButton)    
         self.block_size_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.block_size_widget)
 
         self.cval_widget = ValidatedFloatInputWidget('Constant:', self.operation.C, decimals=1)
+        self.cval_widget.valueChanged.connect(self._enableButton)
         self.cval_widget.editingFinished.connect(self._updateParameters)
         layout_main.addWidget(self.cval_widget)
 
-        button = QPushButton('Apply')
-        button.clicked.connect(lambda: self._updateParameters(True))
-        layout_main.addWidget(button)
+        self.button = QPushButton('Apply')
+        self.button.clicked.connect(lambda: self._updateParameters(True))
+        layout_main.addWidget(self.button)
 
         layout_main.addStretch()
+
+    def valid(self):
+        return self.max_widget.valid() and self.block_size_widget.valid() and self.cval_widget.valid()
+
+    @Slot()
+    def _enableButton(self):
+        valid = self.valid()
+        self.button.setEnabled(valid)
+        self.valueChanged.emit(valid)
     
     @Slot()
     def _updateParameters(self, display_message=False):
-        if self.max_widget.valid() and self.block_size_widget.valid() and self.cval_widget.valid():
+        if self.valid():
             self.operation.set_max_value(self.max_widget.value())
             self.operation.set_threshold_type(self.type_widget.value()[0])
             self.operation.set_method(self.method_widget.value()[0])
             self.operation.set_block_size(self.block_size_widget.value())
             self.operation.set_C(self.cval_widget.value())
             self.configurationUpdated.emit()
-        else:
-            if display_message:
-                displayError('Configuration is invalid, please change the parameters.', parent=self)
+        self._enableButton()
 
 
 class PreProcOpConfigDialog(QDialog):
@@ -239,9 +293,10 @@ image which will be passed as input to the operation's 'apply()' method)."""
         layout_row.addWidget(gb_config)
 
         wclass = self._config_widget_mapping[self.operation.name]
-        config_widget = wclass(self.operation)
-        gb_config.layout().addWidget(config_widget)
-        config_widget.configurationUpdated.connect(self.onConfigurationUpdated)
+        self.config_widget = wclass(self.operation)
+        gb_config.layout().addWidget(self.config_widget)
+        self.config_widget.valueChanged.connect(self.onValueChanged)
+        self.config_widget.configurationUpdated.connect(self.onConfigurationUpdated)
         gb_config.setMinimumWidth(200)
 
         # 2nd column: preview
@@ -273,4 +328,9 @@ image which will be passed as input to the operation's 'apply()' method)."""
 
     @Slot()
     def onConfigurationUpdated(self):
-        self.preview.onPreprocessorChanged(self.preprocessor)
+        if self.config_widget.valid():
+            self.preview.onPreprocessorChanged(self.preprocessor)
+
+    @Slot(bool)
+    def onValueChanged(self, valid: bool):
+        self.btn_box.button(QDialogButtonBox.Ok).setEnabled(valid)

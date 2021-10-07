@@ -97,14 +97,17 @@ class ValidatedFloatInputWidget(QWidget):
             return None
     
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.Wheel and watched == self.line_edit:
-            # Use mouse wheel to increase/decrease the value
-            val = float(self.line_edit.text())
-            if val is not None:
-                fac = 10 if event.modifiers() & Qt.ControlModifier else 1
-                val = val + fac * (-1.0 if event.delta() < 0 else +1.0)
-                self._setValue(val)
-            return True
+        if watched == self.line_edit:
+            if event.type() == QEvent.Wheel:
+                # Use mouse wheel to increase/decrease the value
+                val = float(self.line_edit.text())
+                if val is not None:
+                    fac = 10 if event.modifiers() & Qt.ControlModifier else 1
+                    val = val + fac * (-1.0 if event.delta() < 0 else +1.0)
+                    self._setValue(val)
+                return True
+            elif event.type() in [QEvent.FocusOut, QEvent.Leave]:
+                self.editingFinished.emit()
         return super().eventFilter(watched, event)
 
     def _setValue(self, value):
@@ -120,10 +123,10 @@ class ValidatedFloatInputWidget(QWidget):
             self.is_valid = True
             val = float(modified_text)
             self.line_edit.setStyleSheet("border: 2px solid green;")
-            self.valueChanged.emit()
         elif res in [QValidator.Invalid, QValidator.Intermediate]:
             self.is_valid = False
             self.line_edit.setStyleSheet("border: 2px solid red;")
+        self.valueChanged.emit()
 
 
 class ValidatedIntegerInputWidget(QWidget):
@@ -136,6 +139,7 @@ class ValidatedIntegerInputWidget(QWidget):
                  parent=None):
         super().__init__(parent)
         layout = QHBoxLayout()
+        self.initial_value = initial_value
         self.setLayout(layout)
         if label_text is not None:
             # Label to the left:
@@ -165,14 +169,18 @@ class ValidatedIntegerInputWidget(QWidget):
             self._setValue(initial_value)
     
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.Wheel and watched == self.line_edit:
-            # Use mouse wheel to increase/decrease the value
-            val = int(self.line_edit.text())
-            if val is not None:
-                fac = 10 if event.modifiers() & Qt.ControlModifier else 1
-                val = val + fac * (-1 if event.delta() < 0 else +1)
-                self._setValue(val)
-            return True
+        if watched == self.line_edit:
+            if event.type() == QEvent.Wheel:
+                # Use mouse wheel to increase/decrease the value
+                self.line_edit.setFocus(Qt.MouseFocusReason)
+                val = int(self.line_edit.text())
+                if val is not None:
+                    fac = 10 if event.modifiers() & Qt.ControlModifier else 1
+                    val = val + fac * (-1 if event.delta() < 0 else +1)
+                    self._setValue(val)
+                return True
+            elif event.type() in [QEvent.FocusOut, QEvent.Leave]:
+                self.editingFinished.emit()
         return super().eventFilter(watched, event)
 
     def valid(self) -> bool:
@@ -195,18 +203,19 @@ class ValidatedIntegerInputWidget(QWidget):
         # print(f'Validated "{text}": {res}', self.validator.bottom(), self.validator.top())
 
         if res == QValidator.Acceptable:
-            self.is_valid = True
             val = int(modified_text)
             # Check if the user wants the number to be divisible by X, giving
             # some specified remainder
             if self.divisible_by is not None and val % self.divisible_by != self.division_remainder:
                 res = QValidator.Invalid
             else:
+                self.is_valid = True
                 self.line_edit.setStyleSheet("border: 2px solid green;")
-                self.valueChanged.emit()
+                # self.valueChanged.emit()
         if res in [QValidator.Invalid, QValidator.Intermediate]:
             self.is_valid = False
             self.line_edit.setStyleSheet("border: 2px solid red;")
+        self.valueChanged.emit()
 
 
 class SelectionInputWidget(QWidget):
@@ -243,8 +252,6 @@ class SelectionInputWidget(QWidget):
     @Slot(str)
     def _textEdited(self, text):
         res, modified_text, _ = self.validator.validate(text, 0)
-        # print(f'Validated "{text}": {res}', self.validator.bottom(), self.validator.top())
-
         if res == QValidator.Acceptable:
             self.is_valid = True
             val = int(modified_text)
