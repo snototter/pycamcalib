@@ -2,9 +2,10 @@ import os
 import numpy as np
 import typing
 from vito import imutils
+from typing import Tuple, List
 
 
-def _is_image_filename(f):
+def _is_image_filename(f: str) -> bool:
     """Returns True if the given filename has a supported image format extension."""
     # We only test for the most common formats, supported by OpenCV and/or Pillow
     img_extensions = ['.bmp', '.jpeg', '.jpg', '.png', '.ppm', '.tif', '.webp']
@@ -39,7 +40,7 @@ class ImageSource(object):
         """Returns True if there is a file not yet accessed via next()."""
         return 0 <= self.idx < len(self.files)  # Python allows chained comparisons
 
-    def next(self) -> typing.Tuple[np.ndarray, str]:
+    def next(self) -> Tuple[np.ndarray, str]:
         """Loads the next image and additionally returns the (full) filename."""
         if not self.is_available():
             return None, None
@@ -48,18 +49,20 @@ class ImageSource(object):
         self.idx += 1
         return img, fn
 
-    def num_images(self):
+    def num_images(self) -> int:
         return len(self.files)
 
-    def filenames(self):
+    def filenames(self) -> List[str]:
         """Returns a list of all (basename) image names within the folder."""
         return self.files
 
-    def load_all(self):
+    def load_all(self) -> List[np.ndarray]:
+        """Loads and returns all images."""
         return [imutils.imread(os.path.join(self.folder, self.files[i]))
                 for i in range(len(self.files))]
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> np.ndarray:
+        """Returns the n-th image."""
         if self.images is None:
             self.images = self.load_all()
         return self.images[index]

@@ -8,7 +8,7 @@ from reportlab.graphics import renderPDF, renderPM
 from vito import pyutils, imutils
 
 
-def export_svgwrite_drawing(dwg: svgwrite.Drawing, filename: str):
+def export_svgwrite_drawing(dwg: svgwrite.Drawing, filename: str) -> None:
     dwg.saveas(filename, pretty=True)
 
 
@@ -25,7 +25,7 @@ def svgwrite2image(dwg: svgwrite.Drawing) -> np.ndarray:
 
 def export_board(board_specification, output_basename: str=None, output_folder: str='.',
                  export_pdf: bool=True, export_png: bool=True, export_svg: bool=True,
-                 prevent_overwrite: bool=True):
+                 prevent_overwrite: bool=True) -> None:
     """Saves the given calibration pattern to disk.
     
 :board_specification: Contains the calibration board specification.
@@ -92,7 +92,7 @@ def export_board(board_specification, output_basename: str=None, output_folder: 
 def overlay_pattern_specification(dwg: svgwrite.Drawing, text_line1: str, text_line2: str,
                                   board_height_mm: float, available_space_mm: float, offset_left_mm: float,
                                   font_size_mm: int = 4, line_padding_mm: int = 1,
-                                  color_overlay: str = 'rgb(120, 120, 120)'):
+                                  color_overlay: str = 'rgb(120, 120, 120)') -> None:
     """Overlays the pattern specification strings onto the SVG drawing.
     Depending on the available free space at the bottom of the board this will:
     * Place both text_line arguments below each other, or

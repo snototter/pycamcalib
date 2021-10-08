@@ -3,6 +3,7 @@ import logging
 import numpy as np
 from vito import imutils, imvis, pyutils
 from .img_alignment import Method, Alignment
+import os
 
 _logger = logging.getLogger()
 
@@ -18,7 +19,7 @@ def _generate_warped_image(img, tx, ty, tz, rx, ry, rz):
 
 def demo():
     #TODO separate assets folder, use abspath
-    img = imutils.imread('flamingo.jpg')
+    img = imutils.imread(os.path.join(os.path.dirname(__file__), '..', '..', 'sandbox', 'flamingo.jpg'))
     rect = (180, 170, 120, 143)
     target_template = imutils.roi(img, rect)
     imvis.imshow(target_template, 'Template', wait_ms=10)

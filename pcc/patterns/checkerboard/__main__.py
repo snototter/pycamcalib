@@ -233,8 +233,8 @@ def demo_shifted_checkerboard():
                                              num_squares_horizontal=9,
                                              num_squares_vertical=6,
                                              checkerboard_square_length_mm=90, overlay_board_specifications=False)
-    export_board(board, prevent_overwrite=False)
-    assert False
+    # export_board(board, prevent_overwrite=False)
+    # assert False
 
     bwidth, bheight = PAPER_DIMENSIONS['A4']
     board = ShiftedCheckerboardSpecification('shifted-checkerboard',
@@ -243,7 +243,7 @@ def demo_shifted_checkerboard():
                                              num_squares_vertical=8,
                                              checkerboard_square_length_mm=30)#, overlay_board_specifications=False)
     
-    export_board(board, prevent_overwrite=False, export_png=False)
+    # export_board(board, prevent_overwrite=False, export_png=False)
     # # assert False
 
     
@@ -258,9 +258,9 @@ def demo_shifted_checkerboard():
     imvis.imshow(board.image(), title='Calibration Board', wait_ms=-1)
 
     from vito import pyutils
-    from ...processing import ImageDirectorySource
+    from ...processing import ImageSource
     import cv2
-    src = ImageDirectorySource('example-ccb')
+    src = ImageSource('example-ccb')
     image_points = list()
     object_points = list()
     img_shape = None

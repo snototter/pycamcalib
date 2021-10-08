@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from vito import imutils
+from typing import Tuple
 
 
 class CheckerboardDetector(object):
@@ -9,7 +10,7 @@ class CheckerboardDetector(object):
         self.nrows = self.board_spec.num_inner_corners_vertical
         self.ncols = self.board_spec.num_inner_corners_horizontal
 
-    def process(self, image: np.ndarray):
+    def process(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         image_points = None
         object_points = None
         gray = imutils.grayscale(image)
@@ -32,4 +33,3 @@ class CheckerboardDetector(object):
             imvis.imshow(vis, wait_ms=100)
             #TODO end remove
         return image_points, object_points
-    
