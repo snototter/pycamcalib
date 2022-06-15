@@ -1,8 +1,9 @@
 import setuptools
+import os
 
 # Load version string
 loaded_vars = dict()
-with open('pcc/version.py') as fv:
+with open(os.path.join(os.path.dirname(__file__), 'pcc', 'version.py')) as fv:
     exec(fv.read(), loaded_vars)
 
 setuptools.setup(
@@ -14,15 +15,16 @@ setuptools.setup(
     url="https://github.com/snototter/pycamcalib",
     packages=setuptools.find_packages(),
     install_requires=[
-        'dataclasses',#TODO drop?
+        'dataclasses',  # introduced to standard packages in py3.7
         'numpy',
         'svglib',
         'svgwrite',
-        'opencv-python-headless',  # specifying as in https://stackoverflow.com/a/68437088 does not work :(
+        'opencv-python-headless',
         'pyside2',
         'qimage2ndarray',
         'toml',
-        'vito'],
+        'vito'
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
