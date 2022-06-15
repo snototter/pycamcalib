@@ -2,6 +2,9 @@
 enable = true
 
 [[preproc.filters]]
+filter = "histeq"
+
+[[preproc.filters]]
 filter = "gamma"
 gamma = 1.5
 
@@ -18,4 +21,3 @@ method = "otsu"
 filter = "adaptive-threshold"
 type = "binary-foo"
 method = "gaussian"
-
