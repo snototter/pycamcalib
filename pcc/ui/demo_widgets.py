@@ -1,7 +1,7 @@
 """Lists all custom controls/widgets"""
 import sys
 from PySide2 import QtCore, QtWidgets
-from .widgets import ImageSourceSelectorWidget
+from pcc.ui.widgets import ImageSourceSelectorWidget
 
 
 @QtCore.Slot(str)
