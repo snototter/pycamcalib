@@ -29,8 +29,6 @@ class HistogramEqualization(FilterBase):
         else:
             return cv2.equalizeHist(image)
 
-    def __str__(self) -> str:
-        return type(self).display_name()
 
 #TODO refactor
 # class PreProcOpCLAHE(PreProcOperationBase):
