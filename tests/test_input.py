@@ -43,8 +43,3 @@ def test_image_source():
         assert img_source.images[idx] is not None
         assert isinstance(img_source.images[idx], np.ndarray)
     assert img_source.is_available()
-    
-
-#TODO test swapping filters
-#TODO test applying filters
-#TODO test en/disabling filters
