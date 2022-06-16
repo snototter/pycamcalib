@@ -19,6 +19,8 @@ Camera calibration UI
 ## Setup
 TODO mention opencv-python/opencv/qt issue  
 either use opencv-python + CLI, or install system package opencv + link their bindings (simple `cv2.pth`)
+opencv-python-headless seems to work for now (June/2022)
+
 
 
 ## Status

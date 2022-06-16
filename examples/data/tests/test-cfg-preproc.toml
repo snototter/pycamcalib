@@ -1,0 +1,22 @@
+[preproc]
+
+[[preproc.filters]]
+filter = "histeq"
+
+[[preproc.filters]]
+filter = "gamma"
+gamma = 1.5
+
+[[preproc.filters]]
+filter = "grayscale"
+
+[[preproc.filters]]
+filter = "threshold"
+# TODO see doc of preproc.filters.Thresholding
+type = "binary"
+method = "otsu"
+
+[[preproc.filters]]
+filter = "adaptive-threshold"
+type = "binary-foo"
+method = "gaussian"

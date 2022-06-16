@@ -1,4 +1,6 @@
 from typing import Any
+import numpy as np
+
 
 class FilterBase(object):
     """Base class for all preprocessing filters.
@@ -43,6 +45,9 @@ TODO doc!
     def __init__(self):
         self.enabled = True
 
+    def apply(self, image: np.ndarray) -> np.ndarray:
+        raise NotImplementedError(
+            f'Filter "{type(self).filter_name()}" does not override `apply`.')
 
     def set_enabled(self, enabled) -> None:
         """Enables/disables this filter instance."""
@@ -65,7 +70,7 @@ TODO doc!
         return d
 
     def __repr__(self) -> str:
-        return self.name
+        return type(self).filter_name()
 
     def __str__(self) -> str:
         return type(self).display_name()
@@ -74,18 +79,45 @@ TODO doc!
 # List of all available preprocessing operations.
 # Since we want to provide a custom ordering of the operations in the UI, this
 # list cannot be retrieved automatically (e.g. via inspect)
-AVAILABLE_FILTERS = dict()
+__REGISTERED_FILTERS = dict()
 
-def register_filter(filter_name: str, cls: Any) -> None:
-    global AVAILABLE_FILTERS
-#TODO check if name unique
-    if filter_name in AVAILABLE_FILTERS:
+def register_filter(filter_name: str, cls: FilterBase) -> None:
+    """Registers the filter class, so that it can be created via
+    :func:`create_filter`.
+    
+    Args:
+        filter_name: Name used to identify this filter.
+        cls: Reference to the filter class.
+
+    Raises:
+        KeyError: If the `filter_name` has already been used.
+    """
+    global __REGISTERED_FILTERS
+    if filter_name in __REGISTERED_FILTERS:
         raise KeyError(f'Filter name `{filter_name}` has already been registered.')
-    AVAILABLE_FILTERS[filter_name] = cls
+    if cls == FilterBase or not issubclass(cls, FilterBase):
+        raise ValueError(f'Filter {filter_name} is not a FilterBase subclass.')
+    __REGISTERED_FILTERS[filter_name] = cls
+
+
+def unregister_filter(filter_name: str) -> None:
+    """Unregisters the filter (used to simplify testing pcc)."""
+    global __REGISTERED_FILTERS
+    __REGISTERED_FILTERS.pop(filter_name)
 
 
 def create_filter(filter_name: str) -> FilterBase:
-    if filter_name not in AVAILABLE_FILTERS:
+    """Constructs & returns the specified filter.
+    
+    Raises:
+        KeyError: If the `filter_name` is unknown, i.e. if it has not been
+            registered via :func:`register_filter`.
+    """
+    if filter_name not in __REGISTERED_FILTERS:
         raise KeyError(f'Filter with name `{filter_name}` has not been registered!')
-    return AVAILABLE_FILTERS[filter_name]()
+    return __REGISTERED_FILTERS[filter_name]()
 
+
+def list_filter_names() -> list:
+    """Returns the names of all registered filters."""
+    return [name for name in __REGISTERED_FILTERS]

@@ -1,0 +1,16 @@
+[run]
+omit =
+    # Ignore tests
+    tests/*
+    # version.py is exec'd but not run by pcc, thus pytest-cov isn't able to count it correctly
+    pcc/version.py
+    # Ignore coverage for non-refactored code
+    # FIXME adjust after refactoring!
+    pcc/alignment/*
+    pcc/calibration/*
+    pcc/patterns/*
+    pcc/processing/*
+    # Ignore UI
+    pcc/ui/*
+    pcc/mono.py
+

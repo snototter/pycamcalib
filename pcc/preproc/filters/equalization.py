@@ -19,7 +19,7 @@ class HistogramEqualization(FilterBase):
         return 'Histogram Equalization'
 
     def apply(self, image: np.ndarray) -> np.ndarray:
-        if not self.enabled:
+        if not self.enabled or image is None:
             return image
         if image.ndim == 3 and image.shape[2] in [3, 4]:
             ycrcb = cv2.cvtColor(image[:, :, :3], cv2.COLOR_RGB2YCrCb)
@@ -51,8 +51,8 @@ class HistogramEqualization(FilterBase):
 #         return f'{self.display} (clip={self.clip_limit:.1f}, tile={self.tile_size})'
 
 #     def apply(self, image: np.ndarray) -> np.ndarray:
-#         if not self.enabled:
-#             return image
+#         if not self.enabled or image is None:
+            # return image
 #         if image.ndim == 3 and image.shape[2] in [3, 4]:
 #             ycrcb = cv2.cvtColor(image[:, :, :3], cv2.COLOR_RGB2YCrCb)
 #             yeq = self.clahe.apply(ycrcb[:, :, 0])

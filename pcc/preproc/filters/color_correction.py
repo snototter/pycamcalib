@@ -15,9 +15,9 @@ class GrayscaleConversion(FilterBase):
         return 'Grayscale'
 
     def apply(self, image: np.ndarray) -> np.ndarray:
-        if self.enabled:
-            return imutils.grayscale(image)
-        return image
+        if not self.enabled or image is None:
+            return image
+        return imutils.grayscale(image)
 
 
 class GammaCorrection(FilterBase):
@@ -38,7 +38,7 @@ class GammaCorrection(FilterBase):
         self.set_gamma(1.0)
 
     def apply(self, image: np.ndarray) -> np.ndarray:
-        if not self.enabled:
+        if not self.enabled or image is None:
             return image
         return cv2.LUT(image, self.lookup_table)
 

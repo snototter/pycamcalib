@@ -42,7 +42,7 @@ class Thresholding(FilterBase):
         self.set_max_value(255)
 
     def apply(self, image: np.ndarray) -> np.ndarray:
-        if not self.enabled:
+        if not self.enabled or image is None:
             return image
         # Otsu & Triangle algorithms only support grayscale images
         if image.ndim == 3 and self.method in [cv2.THRESH_TRIANGLE, cv2.THRESH_OTSU]:
@@ -149,7 +149,7 @@ class AdaptiveThresholding(FilterBase):
         self.set_C(0)
 
     def apply(self, image: np.ndarray) -> np.ndarray:
-        if not self.enabled:
+        if not self.enabled or image is None:
             return image
         # Ensure single-channel input
         if image.ndim == 3:
