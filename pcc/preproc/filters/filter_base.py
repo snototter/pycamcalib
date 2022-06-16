@@ -29,7 +29,8 @@ class FilterBase(object):
       * Implement setter methods for all parameters which perform proper sanity
         checks.
       * Override :meth:`get_configuration` and :meth:`set_configuration` to
-        save & restore the filter's state.
+        save & restore the filter's state. Make sure to call the super class'
+        get/set configuration methods, too!
     * Each filter class must be registered via :func:`register_filter`
     * Include a test case for your own filters!
     """

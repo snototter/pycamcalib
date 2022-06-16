@@ -13,10 +13,14 @@ filter = "grayscale"
 [[preproc.filters]]
 filter = "threshold"
 # TODO see doc of preproc.filters.Thresholding
-type = "binary"
 method = "otsu"
+type = "binary"
+max_value = 255
 
 [[preproc.filters]]
 filter = "adaptive-threshold"
-type = "binary-foo"
+type = "binary-inv"
 method = "gaussian"
+block_size = 7
+C = 0
+

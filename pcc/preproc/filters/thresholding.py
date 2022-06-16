@@ -87,7 +87,7 @@ class Thresholding(FilterBase):
         # Otsu & Triangle compute the optimal threshold based
         # on the image content (a fixed threshold will simply
         # be ignored)
-        if self.threshold_type not in [cv2.THRESH_OTSU, cv2.THRESH_TRIANGLE]:
+        if self.method not in [cv2.THRESH_OTSU, cv2.THRESH_TRIANGLE]:
             d['threshold_value'] = self.threshold_value
         d.update(super().get_configuration())
         return d
@@ -141,7 +141,6 @@ class AdaptiveThresholding(FilterBase):
         self.threshold_type = None
         self.block_size = None
         self.C = None
-        # Use setter to perform sanity checks #TODO use EVERYWHERE
         self.set_max_value(255)
         self.set_method('mean')
         self.set_threshold_type('binary')
@@ -177,8 +176,8 @@ class AdaptiveThresholding(FilterBase):
             raise ValueError(f'Block size ({block_size}) must be odd!')
         self.block_size = block_size
 
-    def get_configuration(self, config: dict) -> None:
-        super().configure(config)
+    def set_configuration(self, config: dict) -> None:
+        super().set_configuration(config)
         if 'method' in config:
             self.set_method(config['method'])
         if 'type' in config:
@@ -223,4 +222,3 @@ class AdaptiveThresholding(FilterBase):
 
 register_filter(Thresholding.filter_name(), Thresholding)
 register_filter(AdaptiveThresholding.filter_name(), AdaptiveThresholding)
-
