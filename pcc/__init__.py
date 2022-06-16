@@ -4,7 +4,7 @@
 Python utility package for intrinsic camera calibration.
 """
 
-__all__ = ['patterns', 'preproc']
+__all__ = ['input', 'patterns', 'preproc']
 __author__ = 'snototter'
 
 # Load version

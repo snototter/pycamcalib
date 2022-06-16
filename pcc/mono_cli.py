@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
 
+from pcc import input, preproc
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -22,7 +24,13 @@ def parse_args():
 
 def calibrate_mono_cli():
     args = parse_args()
-    
+    image_source = input.ImageSource(args.image_directory)
+    preprocessor = preproc.Preprocessor()
+    if args.preproc_config is not None:
+        preprocessor.load_toml(args.preproc_config) 
+
+    for calib_img in image_source:
+        print(f'Processing {calib_img}')
 
 
 if __name__ == '__main__':

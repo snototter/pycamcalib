@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import toml
+from pathlib import Path
 
 from pcc.preproc import filters
 
@@ -88,12 +89,12 @@ class Preprocessor(object):
             }
         }
 
-    def save_toml(self, filename: str) -> None:
+    def save_toml(self, filename):
         """Stores the preprocessing pipeline as TOML configuration."""
         with open(filename, 'w') as fp:
             toml.dump(self.get_configuration(), fp)
 
-    def load_toml(self, filename: str) -> None:
+    def load_toml(self, filename):
         """Loads the preprocessing pipeline from the given TOML file.
 
         The filters must be configured as entries of the TOML table
