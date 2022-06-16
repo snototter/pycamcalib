@@ -6,24 +6,32 @@ class FilterBase(object):
     """Base class for all preprocessing filters.
     
     Basic requirements for each filter:
-    * it must OVERRIDE TODO a unique class-wide `name` attribute
-    * it must OVERRIDE TODO display_name; filter_name; + override __str__ !
-a class-wide 'display' attribute (speaking name for class selection before instantiation)
-    * it must implement `description()`-> str' to return a brief but nicely
-      formatted name (used for display within the UI). You can include a summary
-      of its configuration, e.g. "Threshold (t=128)"
-    * it must implement 'apply(np.ndarray) -> np.ndarray'
-    * it must be registered TODO(!!) within 'AVAILABLE_PREPROCESSOR_OPERATIONS'
-
-TODO doc!
-    Life-cycle of a filter:
-    * Construction via default c'tor. This must initialize all parameters to
-      sane default values.
-    * Configuration via :meth:`configure`. This must set all parameters from
-      the input dictionary.
-    * it must override 'configure(dict) -> None' to load parameters from a dictionary
-    * it must override 'freeze() -> dict' to store all parameters in a dictionary
-    * it should override '__repr__() -> str'
+    * If you implement your own preprocessing filter, it's obviously a good idea
+      to check the existing filters first on how it could/should be done ;-)
+    * The filter must override :meth:`filter_name`, :meth:`display_name`,
+      :meth:`apply`, and :meth:`__str__`
+    * In a nutshell:
+      * filter_name: A unique identifier, used for lookups and configuration
+        files.
+      * display_name: Human readable name, used in UI components, will be
+        displayed to the user.
+      * __str__: Should reuse `display_name` (and may optionally add a summary
+        of the filter's configuration parameters), e.g.
+        `type(self).display_name() + ' param1=0.1'`
+      * apply: must include (at least) the following sanity check:
+        ```
+        if not self.enabled or image is None:
+            return image
+        ```
+    * A filter must have a default constructor which initializes all internal
+      parameters to some sane/recommended defaults.
+    * If the filter requires parametrization:
+      * Implement setter methods for all parameters which perform proper sanity
+        checks.
+      * Override :meth:`get_configuration` and :meth:`set_configuration` to
+        save & restore the filter's state.
+    * Each filter class must be registered via :func:`register_filter`
+    * Include a test case for your own filters!
     """
 
     @staticmethod
@@ -39,7 +47,7 @@ TODO doc!
 
     @staticmethod
     def display_name() -> str:
-        """TODO"""
+        """Returns a human-readable name for this filter (to be used in UI components)."""
         return "Basic Filter"
 
     def __init__(self):
@@ -73,6 +81,11 @@ TODO doc!
         return type(self).filter_name()
 
     def __str__(self) -> str:
+        """Returns the string representation.
+        
+        By convention, this representation must always start with the
+        :meth:`display_name`.
+        """
         return type(self).display_name()
 
 
