@@ -24,3 +24,8 @@ method = "gaussian"
 block_size = 7
 C = 0
 
+[[preproc.filters]]
+filter = "clahe"
+tile_size = [17, 17]
+clip_limit = 3.0
+

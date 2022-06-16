@@ -24,6 +24,15 @@ opencv-python-headless seems to work for now (June/2022)
 
 
 ## Status
+* Refactoring:
+  * [ ] `input` package
+  * [ ] `preproc` package
+  * [ ] `patterns.common`
+  * [ ] `patterns.checkerboard`
+  * [ ] `patterns.eddie`
+  * [ ] Implement correspondence search
+  * [ ] Implement calibration pipeline
+  * [ ] `ui` --> comes last
 * [ ] Use configurable template
   * [x] Render to SVG
   * [x] Render to PNG
