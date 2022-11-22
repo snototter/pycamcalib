@@ -1,8 +1,7 @@
-from PIL.Image import Image
-from . import CheckerboardSpecification
-from . import CheckerboardDetector, ShiftedCheckerboardSpecification
-from ..common import PAPER_DIMENSIONS
-from .. import export_board
+from pcc.patterns.checkerboard import CheckerboardSpecification
+from pcc.patterns.checkerboard import CheckerboardDetector, ShiftedCheckerboardSpecification
+from pcc.patterns.common import PAPER_DIMENSIONS
+from pcc.patterns.svgutils import export_board
 import logging
 import cv2
 from vito import imvis, imutils
@@ -182,8 +181,8 @@ def demo_standard_checkerboard():
     imvis.imshow(board.image(), title='board', wait_ms=-1)
 
     from vito import pyutils
-    from ...processing import ImageDirectorySource
-    src = ImageDirectorySource('example-scb')
+    from pcc.processing import ImageSource
+    src = ImageSource('example-scb')
     image_points = list()
     object_points = list()
     img_shape = None
@@ -227,21 +226,21 @@ def demo_standard_checkerboard():
 
 
 def demo_shifted_checkerboard():
-    # bwidth, bheight = PAPER_DIMENSIONS['A3']
-    board = ShiftedCheckerboardSpecification('lidar-calibration',
-                                             board_width_mm=917, board_height_mm=642,
-                                             num_squares_horizontal=9,
-                                             num_squares_vertical=6,
-                                             checkerboard_square_length_mm=90, overlay_board_specifications=False)
-    export_board(board, prevent_overwrite=False)
-    assert False
+    # # bwidth, bheight = PAPER_DIMENSIONS['A3']
+    # board = ShiftedCheckerboardSpecification('lidar-calibration',
+    #                                          board_width_mm=917, board_height_mm=642,
+    #                                          num_squares_horizontal=9,
+    #                                          num_squares_vertical=6,
+    #                                          checkerboard_square_length_mm=90, overlay_board_specifications=False)
+    # export_board(board, prevent_overwrite=False)
+    # assert False
 
     bwidth, bheight = PAPER_DIMENSIONS['A4']
-    board = ShiftedCheckerboardSpecification('shifted-checkerboard',
-                                             board_width_mm=bwidth, board_height_mm=bheight,
-                                             num_squares_horizontal=6,
-                                             num_squares_vertical=8,
-                                             checkerboard_square_length_mm=30)#, overlay_board_specifications=False)
+    board = ShiftedCheckerboardSpecification(
+        'shifted-checkerboard',
+        board_width_mm=bwidth, board_height_mm=bheight,
+        num_squares_horizontal=6, num_squares_vertical=8,
+        checkerboard_square_length_mm=30)#, overlay_board_specifications=False)
     
     export_board(board, prevent_overwrite=False, export_png=False)
     # # assert False
@@ -258,9 +257,12 @@ def demo_shifted_checkerboard():
     imvis.imshow(board.image(), title='Calibration Board', wait_ms=-1)
 
     from vito import pyutils
-    from ...processing import ImageDirectorySource
+    from pcc.processing import ImageSource
     import cv2
-    src = ImageDirectorySource('example-ccb')
+    from pathlib import Path
+    pth = Path(__file__).parent.parent.parent.parent / 'examples' /'data' / 'shifted-checkerboard'
+    print('TODO', pth)
+    src = ImageSource(pth)
     image_points = list()
     object_points = list()
     img_shape = None
@@ -300,6 +302,7 @@ def demo_shifted_checkerboard():
                 "object_points": object_points,
                 "img_points": image_points,
                 "calibration_errors": error}
+    plot_3d_camera_plots(calibration_data)
 
 
 if __name__ == '__main__':
