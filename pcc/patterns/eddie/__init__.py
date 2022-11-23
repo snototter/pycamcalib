@@ -1,2 +1,2 @@
-# from .pattern_specs import *
-# from .marker_detection import *
+from pcc.patterns.eddie.pattern_specs import *
+from pcc.patterns.eddie.marker_detection import *

@@ -119,6 +119,16 @@ def det_demo(imgs):
 
 
 if __name__ == '__main__':
+    # If OpenCV is installed headless, the demo will crash because PIL opens a new 
+    # default image viewer per `imvis.imshow` request. Thus, try to show an image
+    # with OpenCV first to avoid this issue.
+    try:
+        cv2.imshow("dummy image", np.ones((200, 200, 3), dtype=np.uint8))
+        cv2.waitKey(10)
+        cv2.destroyAllWindows()
+    except cv2.error:
+        raise RuntimeError('OpenCV highgui is required for this demo!')
+
     # # pattern_specs = patterns.eddie.PatternSpecificationEddie('test',
     # #     target_width_mm=150, target_height_mm=60,
     # #     dia_circles_mm=5, dist_circles_mm=10)#, bg_color='orange')
@@ -133,6 +143,7 @@ if __name__ == '__main__':
         target_width_mm=315, target_height_mm=410,
         dia_circles_mm=5, dist_circles_mm=11)#, bg_color='orange')
     
+
     # Match template:
     # #https://docs.opencv.org/master/df/dfb/group__imgproc__object.html#ga586ebfb0a7fb604b35a23d85391329be
     imgs = load_images()
