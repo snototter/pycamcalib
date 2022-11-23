@@ -221,7 +221,7 @@ class PatternSpecificationEddie:
 * Colors: {self.fg_color} on {self.bg_color}"""
 #TODO add remaining specs to __str__
 
-    def render_svg(self):
+    def svg(self) -> svgwrite.Drawing:
         logging.info(f'Drawing calibration pattern: {self}')
         h_mm = self.target_height_mm
         w_mm = self.target_width_mm
@@ -271,14 +271,14 @@ class PatternSpecificationEddie:
         return dwg
 
     def export_svg(self, filename):
-        dwg = self.render_svg()
+        dwg = self.svg()
         dwg.saveas(filename, pretty=True)
 
     def render_image(self):
         """Renders the calibration pattern to an image (NumPy ndarray),
         performing all actions in-memory."""
         # Load the rendered SVG into a StringIO
-        svg_sio = io.StringIO(self.render_svg().tostring())
+        svg_sio = io.StringIO(self.svg().tostring())
         # Render it to PNG in-memory
         dwg_input = svg2rlg(svg_sio)
         img_mem_file = io.BytesIO()
@@ -366,6 +366,16 @@ class PatternSpecificationEddie:
             from vito import imvis, imutils
             import cv2
             vis = imutils.ensure_c3(self.calibration_template.tpl_full.copy())
+
+            # If OpenCV is installed headless, the demo will crash because PIL opens a new 
+            # default image viewer per `imvis.imshow` request. Thus, try to show an image
+            # with OpenCV first to avoid this issue.
+            try:
+                cv2.imshow("dummy", np.ones((200, 200, 3), dtype=np.uint8))
+                cv2.waitKey(10)
+                cv2.destroyWindow("dummy")
+            except cv2.error:
+                raise RuntimeError('OpenCV highgui is required for this demo!')
 
         visited = np.zeros((num_refpts_per_col, num_refpts_per_row), dtype=np.bool)
         nodes_to_visit = deque()

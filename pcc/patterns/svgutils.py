@@ -42,6 +42,9 @@ def export_board(board_specification, output_basename: str=None, output_folder: 
 :prevent_overwrite: If True and the output file(s) already exist(s), a
                     FileExistsError will be raised
     """
+    if output_folder is None:
+        output_folder = '.'
+
     if all([f is False for f in [export_pdf, export_png, export_svg]]):
         raise ValueError('You must enable at least one export format!')
 

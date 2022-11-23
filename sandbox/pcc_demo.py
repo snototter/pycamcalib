@@ -9,6 +9,9 @@ import logging
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO,
                         format='[%(levelname)s] %(message)s')
-    patterns.export_pattern(patterns.eddie.eddie_test_specs_a4, 'test-folder', None,
-                          export_pdf=True, export_png=False,
-                          prevent_overwrite=False)
+    eddie_a4 = patterns.eddie.PatternSpecificationEddie(
+        'Eddie Test Pattern A4', target_width_mm=210, target_height_mm=297,
+        dia_circles_mm=5, dist_circles_mm=11)
+    patterns.export_board(
+        eddie_a4, output_folder='test-folder', output_basename=None,
+        export_pdf=True, export_png=False, prevent_overwrite=False)
